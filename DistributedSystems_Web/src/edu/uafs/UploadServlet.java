@@ -1,10 +1,13 @@
+/**
+ * Names:         Colton Key, Ross Payne, and Julton Sword
+ * Assignment:    Final Project - LionDB Distributed Server
+ * Class:         CS 3003 - Distributed Systems (4:00 - 5:15 PM)
+ */
+
 package edu.uafs;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.net.Socket;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -33,33 +36,23 @@ public class UploadServlet extends HttpServlet {
 	 */
 	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 		
-		Socket socket;
-		// this doesn't work, but nice try :)
-		if(request.getAttribute("socket") == null) {
-			 socket = new Socket("127.0.0.1", 54320);
-		} else {
-			socket = (Socket) request.getAttribute("socket");
-		}
-		request.setAttribute("socket", socket);
-		
-		PrintWriter toServer = new PrintWriter(socket.getOutputStream(), true);
-		BufferedReader fromServer = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-		
-		// get form data from index.jsp input with name="text"
+		WebClient client = (WebClient) request.getSession(false).getAttribute("client");
 		String text = request.getParameter("text");
 		
-		// send text from input to server
-		toServer.println(text);
+		try {
+			// transfer file to main server
+			client.addFile(text);
+			System.out.printf("Sent 'add %s' to main server\n", text);
+			request.setAttribute("successmsg", "File uploaded successfully!");
+		} catch (Exception e) {
+			// something bad happened
+			
+			request.setAttribute("errormsg", "Exception when uploading file... Wups.");
+		}
 		
-		// consume initial 'connected to main server' message
-		fromServer.readLine();
 		
-		// save response from server
-		request.setAttribute("response", fromServer.readLine());
-		
-		
-		// forward to index.jsp with response from server
-		request.getRequestDispatcher("index.jsp").forward(request, response);
+		// forward to index.jsp with error/success message
+		request.getRequestDispatcher("upload.jsp").forward(request, response);
 	
 	}
 	

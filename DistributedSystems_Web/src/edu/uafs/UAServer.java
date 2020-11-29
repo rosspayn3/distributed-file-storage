@@ -1,10 +1,10 @@
-package edu.uafs;
-
 /**
  * Names:         Colton Key, Ross Payne, and Julton Sword
- * Assignment:    Lab 14 - File Server Communication
+ * Assignment:    Final Project - LionDB Distributed Server
  * Class:         CS 3003 - Distributed Systems (4:00 - 5:15 PM)
  */
+
+package edu.uafs;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -190,7 +190,7 @@ public class UAServer {
 						}
 					}
 					
-					log("Waiting for message from " + socket.toString());
+//					log("Waiting for message from " + socket.toString());
 				}
 				
 				log(socket.toString() + " Client connection closed.");

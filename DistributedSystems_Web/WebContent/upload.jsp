@@ -16,7 +16,7 @@ import="java.io.*, java.net.*, edu.uafs.WebClient"
 <html>
 <head>
 	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
-	<title>Login</title>
+	<title>File Upload</title>
 	<meta charset="ISO-8859-1">
 	<style>
 		body{
@@ -41,30 +41,40 @@ import="java.io.*, java.net.*, edu.uafs.WebClient"
 
 	<div class="container">
 	
-		<h1 class="text-center">Welcome to the <span class="text-info">login</span> page!</h1>
+		<h1 class="text-center">Welcome to the <span class="text-info">upload</span> page, <span class="text-info">${username}</span>!</h1>
 		<h4 class="text-center text-primary">Time to have some fun!</h4>
 	
 		<!-- begin form container -->
 		<div class="mx-auto mt-5 text-center" style="width:300px">
 		
-			<form action="login" method="POST">
-			
+			<!-- Need this form header for transferring files. Form in use below is for text only.
+										   (this part)----v 
+			<form action="upload" method="POST" enctype="multipart/form-data">
+			 -->
+			 
+			<form action="upload" method="POST">
 				<div class="form-group">
-				    
-					<input class="form-control my-2" type="text" id="form-username" name="username" placeholder="Username"/>
+				
+					<!-- File Upload input for later
+					 
+					<label for="fileupload">Choose some files:</label>
+					<input class="form-control-file" type="file" id="fileupload" name="file">
+					 -->
 					
-					<input class="form-control my-2" type="password" id="form-password" name="password" placeholder="Password"/>
+					<label for="form-text">Choose some files:</label>
+					<input class="form-control" type="text" id="form-tet" name="text">
 					
-					<button class="mt-3 btn btn-primary" type="submit">LOGIN</button>
-					
-					<p class="mt-3 text-center text-small">Need an account? <a href="register.jsp">Register now</a>
-				    
 				</div>
 				
 			</form>
 		
 		</div>
 		<!-- end form container -->
+		
+		<div>
+			<p class="mt-3 text-center text-success">${successmsg}</p>
+			<p class="mt-3 text-center text-danger">${errormsg}</p>
+		</div>
 		
 		
 		

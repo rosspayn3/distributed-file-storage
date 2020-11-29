@@ -1,7 +1,12 @@
+/**
+ * Names:         Colton Key, Ross Payne, and Julton Sword
+ * Assignment:    Final Project - LionDB Distributed Server
+ * Class:         CS 3003 - Distributed Systems (4:00 - 5:15 PM)
+ */
+
 package edu.uafs;
 
 import java.io.IOException;
-import java.net.Socket;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -43,12 +48,11 @@ public class LoginServlet extends HttpServlet {
 
 		WebClient client = (WebClient) request.getSession(false).getAttribute("client");
 		
-		client.sendMessage(String.format("login %s %s", username, password));
+		client.login(username, password);
 		System.out.printf("Sent 'login %s %s' to main server\n", username, password);
 		
 		request.getSession().setAttribute("username", username);
-		request.getSession().setAttribute("password", password);
-		request.getRequestDispatcher("welcome.jsp").forward(request, response);
+		request.getRequestDispatcher("upload.jsp").forward(request, response);
 	}
 
 }

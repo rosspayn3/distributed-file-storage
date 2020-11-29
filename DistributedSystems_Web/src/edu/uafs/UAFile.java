@@ -1,4 +1,11 @@
+/**
+ * Names:         Colton Key, Ross Payne, and Julton Sword
+ * Assignment:    Final Project - LionDB Distributed Server
+ * Class:         CS 3003 - Distributed Systems (4:00 - 5:15 PM)
+ */
+
 package edu.uafs;
+
 import java.io.File;
 import java.net.Socket;
 import java.util.LinkedList;
