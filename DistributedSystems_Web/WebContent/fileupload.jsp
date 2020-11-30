@@ -47,16 +47,16 @@ import="java.io.*, java.net.*, edu.uafs.WebClient"
 		<!-- begin form container -->
 		<div class="mx-auto mt-5 text-center" style="width:300px">
 		
-			<form action="upload" method="POST">
-			
-				<div class="form-group">
-				
-					
-					<label for="form-text">Choose some files:</label>
-					<input class="form-control" type="text" id="form-text" name="text">
-					
+			<form action="fileupload" method="POST" enctype="multipart/form-data">
+			 
+			 	<div class="form-group">
+					 
+					<label for="fileupload">Choose a file:</label>
+					<input class="form-control-file" type="file" id="fileupload" name="file">
+					<p><small class="text-warning">*Max file size is 20MB</small></p>
 					
 					<button class="mt-3 btn btn-primary" type="submit">UPLOAD</button>
+					
 				</div>
 				
 			</form>

@@ -51,7 +51,7 @@ public class UploadServlet extends HttpServlet {
 		}
 		
 		
-		// forward to index.jsp with error/success message
+		// forward to upload.jsp with error/success message
 		request.getRequestDispatcher("upload.jsp").forward(request, response);
 	
 	}
