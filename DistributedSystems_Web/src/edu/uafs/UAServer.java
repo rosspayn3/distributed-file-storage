@@ -120,7 +120,7 @@ public class UAServer {
 								} else if (command.equals("add") || command.equals("remove") || command.equals("list")) {
 									if(fileServers.size() > 0) {
                                         if (command.equals("add")) {
-                                        	addFile(parameter);
+                                        	addFile(this.currentUser, parameter);
                                         } else {
                                             int hashCode = parameter.hashCode();
                                             int serverNumber = Math.abs(hashCode % fileServers.size());
@@ -204,13 +204,13 @@ public class UAServer {
 			}
 		}
 		
-		private boolean addFile(String filename) {
+		private boolean addFile(String user, String filename) {
 			
 			try {
 				int[] indices = getServerIndices(filename);
 		        var dest1 = fileServers.get(indices[0]);
 		        var dest2 = fileServers.get(indices[1]);
-		        String messageToFileServer = String.format("%s~%s~%s", socket.toString(), "add", filename);
+		        String messageToFileServer = String.format("%s~%s~%s", socket.toString(), "add", user+":"+filename);
 		        dest1.getValue().println(messageToFileServer);
 		        dest2.getValue().println(messageToFileServer);
 		        fileCount++;
