@@ -50,9 +50,16 @@ public class RegistrationServlet extends HttpServlet {
 		WebClient client = (WebClient) request.getSession(false).getAttribute("client");
 		
 		if(password.equals(confirmpassword)) {
-			client.register(username, password);
-			System.out.printf("Sent 'register %s %s' to main server\n", username, password);
-			response.sendRedirect("login.jsp");
+			boolean success = client.register(username, password);
+			if(success) {
+				System.out.printf("REGISTRATION SERVLET: Sent 'register %s %s' to main server\n", username, password);
+				response.sendRedirect("login.jsp");
+			} else {
+				request.setAttribute("errormsg", "A problem occurred when registering.");
+				request.setAttribute("username", username);
+				request.getRequestDispatcher("register.jsp").forward(request, response);
+			}
+			
 		} else {
 			request.setAttribute("errormsg", "Passwords do not match.");
 			request.setAttribute("username", username);

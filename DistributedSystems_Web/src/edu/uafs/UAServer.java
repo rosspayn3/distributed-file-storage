@@ -166,7 +166,7 @@ public class UAServer {
 											serverOut.println("Login successful.");
 											log("Login successful.");
 										} else {
-											serverOut.println("Invalid login.");
+											serverOut.println("Login failed.");
 											log("Login failed.");
 										}
 									} else {
@@ -198,7 +198,7 @@ public class UAServer {
 				
 			} catch (SocketException ex) {
 				log(socket.toString() + " " + ex.getMessage());
-				handleSocketException(ex, serverIn, serverOut);
+				handleSocketException(ex, this.socket, serverIn, serverOut);
             } catch (Exception ex) {
 				ex.printStackTrace();
 			}
@@ -222,41 +222,58 @@ public class UAServer {
 			
 		}
 		
-		private void handleSocketException(SocketException ex, BufferedReader serverIn, PrintWriter serverOut) {
+		private void handleSocketException(SocketException ex, Socket socket, BufferedReader serverIn, PrintWriter serverOut) {
 			
             if (ex.getMessage().equalsIgnoreCase("connection reset")) {
                 try {
-                    if (serverOut != null)
-                        serverOut.close();
-                    if (serverIn != null)
-                        serverIn.close();
-                    socket.close();
-                } catch (IOException ex2) {
-                    ex2.printStackTrace();
-                }
-                int i = 0;
-                while (i < fileServers.size()) {
-                    SimpleEntry<Socket, PrintWriter> entry = fileServers.get(i);
-                    if (entry.getKey().equals(socket)) {
-                        log("Found disconnected server.");
-                        fileServers.remove(i);
+					closeConnection(socket, serverIn, serverOut);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+                synchronized(fileServers) {
+                	for(int i = 0; i < fileServers.size(); i++) {
+                    	if(fileServers.get(i).getKey() == socket) {
+                    		redistribute(socket);
+                    	}
                     }
-                    i++;
                 }
-                for (var server : fileServers) {
-                    server.getValue().println("distribute");
-                }
+                
             }
             
 		}
 		
 		private void closeConnection(Socket socket, BufferedReader serverIn, PrintWriter serverOut) throws IOException {
 			
-			serverIn.close();
-			serverOut.close();
-			socket.close();
+			try {
+                if (serverOut != null)
+                    serverOut.close();
+                if (serverIn != null)
+                    serverIn.close();
+                socket.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
 			
 		}
+		
+	}
+	
+	private static void redistribute(Socket socket) {
+		
+		int i = 0;
+        while (i < fileServers.size()) {
+            SimpleEntry<Socket, PrintWriter> entry = fileServers.get(i);
+            if (entry.getKey().equals(socket)) {
+                log("Found disconnected server.");
+                synchronized(fileServers) {
+                	 fileServers.remove(i);
+                }
+            }
+            i++;
+        }
+        for(int j = 0; j < fileServers.size(); j++) {
+        	fileServers.get(j).getValue().println("distribute");
+        }
 		
 	}
 	

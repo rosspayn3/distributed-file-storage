@@ -6,7 +6,10 @@
 
 package edu.uafs;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.Socket;
@@ -17,16 +20,19 @@ import javax.servlet.jsp.JspWriter;
 public class WebClient {
 	
 	Socket socket;
-	PrintWriter printWriter;
+	PrintWriter clientOut;
 	OutputStream outputStream;
+	BufferedReader clientIn;
 	
 	public WebClient(HttpSession session, JspWriter out) {
 		
 		try {
 			this.socket = new Socket("127.0.0.1", 54320);
-			this.printWriter = new PrintWriter(socket.getOutputStream(), true);
+			this.clientOut = new PrintWriter(socket.getOutputStream(), true);
 			this.outputStream = socket.getOutputStream();
-			printWriter.println("client connected");
+			this.clientIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+			clientOut.println("client connected");
+			getServerResponse();
 		} catch(Exception e) {
 			try {
 				out.print("<h1 class=\"text-danger text-center\"><strong>Exception</strong></h1>"
@@ -47,20 +53,24 @@ public class WebClient {
 	}
 
 	public PrintWriter getPrintWriter() {
-		return printWriter;
+		return clientOut;
 	}
 
 	public void setPrintWriter(PrintWriter writer) {
-		this.printWriter = writer;
+		this.clientOut = writer;
 	}
 	
 	public boolean register(String username, String password) {
 		
 		try {
-			printWriter.println(String.format("register %s %s", username, password));
-			return true;
+			clientOut.println(String.format("register %s %s", username, password));
+			if(getServerResponse().contains("success")) {
+				return true;
+			} else {
+				return false;
+			}
 		} catch (Exception e) {
-			System.err.println("Exception in WebClient register method.");
+			System.err.println("WEBCLIENT: Exception in WebClient register method.");
 			e.printStackTrace();
 			return false;
 		}
@@ -69,10 +79,14 @@ public class WebClient {
 	
 	public boolean login(String username, String password) {
 		try {
-			printWriter.println(String.format("login %s %s", username, password));
-			return true;
+			clientOut.println(String.format("login %s %s", username, password));
+			if(getServerResponse().contains("success")) {
+				return true;
+			} else {
+				return false;
+			}
 		} catch (Exception e) {
-			System.err.println("Exception in WebClient login method.");
+			System.err.println("WEBCLIENT: Exception in WebClient login method.");
 			e.printStackTrace();
 			return false;
 		}
@@ -82,23 +96,42 @@ public class WebClient {
 		// We may or may not need this method. Just in case.
 		
 		try {
-			printWriter.println(msg);
+			clientOut.println(msg);
 			return true;
 		} catch (Exception e) {
-			System.err.println("Exception in WebClient sendMessage method.");
+			System.err.println("WEBCLIENT: Exception in WebClient sendMessage method.");
 			e.printStackTrace();
 			return false;
 		}
 		
 	}
 	
+	public String getServerResponse() {
+		try {
+			String response = clientIn.readLine();
+			System.out.println("WEBCLIENT: Response from server: " + response);
+			return response;
+		} catch (Exception e) {
+			System.err.println("Exception in WebClient getServerResponse method.");
+			e.printStackTrace();
+			return null;
+		}
+	}
+	
 	public boolean addFile(String file) {
 		
 		try {
 			// send file using output stream
-			printWriter.println("add " + file);
+			clientOut.println("add " + file);
+			String response = getServerResponse();
+			// consume extra success message from second file server 
+			getServerResponse();
+			if(response.contains("success")) {
+				return true;
+			} else {
+				return false;
+			}
 			
-			return true;
 		} catch (Exception e) {
 			// something bad happened
 			

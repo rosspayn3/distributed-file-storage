@@ -48,11 +48,18 @@ public class LoginServlet extends HttpServlet {
 
 		WebClient client = (WebClient) request.getSession(false).getAttribute("client");
 		
-		client.login(username, password);
-		System.out.printf("Sent 'login %s %s' to main server\n", username, password);
+		boolean success = client.login(username, password);
+		System.out.printf("LOGIN SERVLET: Sent 'login %s %s' to main server\n", username, password);
 		
-		request.getSession().setAttribute("username", username);
-		request.getRequestDispatcher("upload.jsp").forward(request, response);
+		if(success) {
+			request.getSession().setAttribute("username", username);
+			request.getRequestDispatcher("upload.jsp").forward(request, response);
+		} else {
+			request.setAttribute("errormsg", "<strong>Username or password is incorrect.</strong>");
+			request.setAttribute("username", username);
+			request.getRequestDispatcher("login.jsp").forward(request, response);
+		}
+		
 	}
 
 }
