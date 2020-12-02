@@ -7,6 +7,7 @@
 package edu.uafs;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -133,7 +134,6 @@ public class UAServer {
 							log(String.format("%s :  %s", socket.toString(), line));
 							String[] cmdArgs = line.split(" ");
 							
-
 							String command = cmdArgs[0].toLowerCase().trim();
 							String parameter = cmdArgs[1].trim();
 
@@ -149,7 +149,7 @@ public class UAServer {
 								if(fileServers.size() > 0) {
 									
                                     if (command.equals("add")) {
-                                    	log("Add command received. Adding file...");
+                                    	log("Add command received. Distributing file to servers...");
                                     	
                                     	// add syntax: add {filename} {file size in bytes}
 										distributeFile(socket, this.currentUser, parameter, cmdArgs[2]);
@@ -243,26 +243,6 @@ public class UAServer {
 				ex.printStackTrace();
 			}
 		}
-
-		// private boolean addFile(String user, String filename) {
-
-		// 	try {
-		// 		int[] indices = getServerIndices(filename);
-
-		//         var dest1 = fileServers.get(indices[0]);
-		//         var dest2 = fileServers.get(indices[1]);
-		//         String messageToFileServer = String.format("%s~%s~%s", socket.toString(), "add", user+":"+filename);
-		//         dest1.getValue().println(messageToFileServer);
-		//         dest2.getValue().println(messageToFileServer);
-		//         fileCount++;
-		// 		userFiles.get(user).add(filename);
-		//         return true;
-		// 	} catch (Exception e) {
-		// 		e.printStackTrace();
-		// 		return false;
-		// 	}
-
-		// }
 
 		private void handleSocketException(SocketException ex, Socket socket, BufferedReader serverIn, PrintWriter serverOut) {
 
@@ -388,41 +368,79 @@ public class UAServer {
 
 	private static boolean distributeFile(Socket clientSocket, String user, String filename, String size){
 
-		log("````````````````````````````````````````````````````````````````````````````````````in distributeFile");
+		log("============= Distributing file to file servers =============");
 		
 		try {
 			
-			int fourKBpage = 4096;
-			byte[] b = new byte[fourKBpage];
+			int pageSize = 4096;
+			byte[] buffer = new byte[pageSize];
 
-			log("getting input/output streams");
 			DataInputStream dataIn = new DataInputStream(clientSocket.getInputStream());
 
 			int bytesRead = 0;
-			int offset = Integer.parseInt(size);
-			
-			
-			log("getting server indices");
+			int bytesLeft = Integer.parseInt(size);
+			log("Size of file about to receive: " + bytesLeft);
+
 			int[] servers = getServerIndices(filename);
 			DataOutputStream server1 = new DataOutputStream(fileServers.get(servers[0]).getKey().getOutputStream());
 			DataOutputStream server2 = new DataOutputStream(fileServers.get(servers[1]).getKey().getOutputStream());
-
-			log("sending bytes...");
-			// maybe read from byte 0 to {size} instead of Mackey logic
-			while( (bytesRead = dataIn.read(b, 0, Math.min(fourKBpage, offset))) > 0){
-				log(offset + " bytes left to send");
-				server1.write(b);
-				server2.write(b);
-				offset -= bytesRead;
+			
+			// buffered output stream for saving file locally for testing
+			BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream("C:\\upload\\received\\"+"\\"+user+"\\"+filename));
+			
+			log("Sending bytes...");
+			
+			//**********************************************************************************************
+			// files are getting padded with null bytes and corrupted when written to disk here. not as
+			// bad with a smaller page size. probably at the end of the buffer. doesn't happen when they're 
+			// written to disk in  FileUploadServlet, so something is weird with this loop even though 
+			// they're the exact same. could be something to do with reading from DataInputStream instead of 
+			// BufferedInputStream?
+			//
+			// also something weird is happening with very small files. with a 2104 byte file, dataIn.read()
+			// should return 2104 to bytesRead at line 405. it only returns 1024 bytes, but then writes 2104
+			// to file. Math.min(pageSize, bytesLeft) is giving two different values at line 405 and 406.
+			// then it loops through again and reads the remaining 1080 bytes and writes 1080 bytes to file
+			// like it should. the first loop through is acting weird.
+			//**********************************************************************************************
+			while( (bytesRead = dataIn.read(buffer, 0, Math.min(pageSize, bytesLeft))) > 0){
+				log("Should have read " + Math.min(pageSize, bytesLeft) + " bytes.");
+				log("Read " + bytesRead + " bytes.");
+				
+				// write file to local disk for testing until we get file servers to accept file transfers
+				bos.write(buffer, 0, Math.min(pageSize, bytesLeft));
+				log("Wrote " + Math.min(pageSize, bytesLeft) + " to file.");
+				
+				//*********************************************************
+				// file servers explode when being sent unexpected things.
+				// their sockets also close when an exception is thrown.
+				// probably need to send them the 'add' command so they
+				// can start reading their input stream for files like this
+				// server does. get all bytes from input stream in their
+				// main thread, then start a new thread that writes those 
+				// bytes to disk.
+				//*********************************************************
+				// send file to file server DataOutputStreams
+//				server1.write(b);
+//				server2.write(b);
+				
+				bytesLeft -= bytesRead;
+				log(bytesLeft + " bytes left to read.");
 			}
 			
 			log("Successfully sent " + size + " bytes to each file server.");
-			log("file distributed to file servers");
 			
 			fileCount++;
 			userFiles.get(user).add(filename + "`" + servers[0] + "`" + servers[1]);
 
-			dataIn.close();
+			//*************************************************************************
+			// don't think we can close this as it's the client thread's input stream.
+			// probably can't close the file server output streams either.
+			//*************************************************************************
+//			dataIn.close();
+			
+			// close output stream that writes to local disk
+			bos.close();
 			return true;
 			
 		} catch (Exception e) {

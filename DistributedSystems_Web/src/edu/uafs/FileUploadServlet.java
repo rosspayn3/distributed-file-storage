@@ -1,11 +1,13 @@
 package edu.uafs;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -28,7 +30,7 @@ import javax.servlet.http.Part;
 public class FileUploadServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 	
-	private static final File tempDir = new File("C:\\upload");
+	private static final File tempdir = new File("C:\\upload");
 
 	
 	/**
@@ -66,8 +68,12 @@ public class FileUploadServlet extends HttpServlet {
 		
 		Collection<String> headers = part.getHeaders("content-disposition");
 		
-	    return headers.toString().substring(headers.toString().lastIndexOf('\\') + 1, headers.toString().length()-2);
+		// use this for built-in browser in Eclipse
+	    // return headers.toString().substring(headers.toString().lastIndexOf('\\') + 1, headers.toString().length()-2);
 		
+		// use this for chrome
+	    return Paths.get(part.getSubmittedFileName()).getFileName().toString();
+	    
 	}
 	
 	/*
@@ -108,50 +114,85 @@ public class FileUploadServlet extends HttpServlet {
 			
 			for (Part part : request.getParts()) {
 				
-				if(part.getSize() > (long) 1024 * 1024 * 100) {
+				// check if file size over X
+				if(part.getSize() > (long) 1024 * 1024 * 100 /* 100 MB */) {
 					return false;
 				}
 				
-//				String filename = getFileName(part);
-				String filename = Paths.get(part.getSubmittedFileName()).getFileName().toString().replace(" ", "-");
+				// get file name and replace spaces with '-'
+				String filename = getFileName(part).replace(" ", "-") + ".temp";
+				String username = (String) request.getSession().getAttribute("username");
+				
+				// number of bytes to send
 				int size = (int) part.getSize();
 				
-				client.sendMessage( String.format("add %s %d", filename, part.getSize()) );
+				//                                              v----  remove .tmp extension  ----v
+				client.sendMessage( String.format("add %s %d", filename.substring(0, filename.length()-5), part.getSize()) );
 				
 				try{
 					
-					// save temporary file
-					
-					File tempFile = new File(tempDir, filename);
+					// save part as temporary file
+					File tempFile = new File(tempdir, filename);
 					
 					try {
-						Files.copy(part.getInputStream(), tempFile.toPath());
+						// check if temporary file already exists from a previous failed upload
+						if(!tempFile.exists()) {
+							Files.copy(part.getInputStream(), tempFile.toPath());
+						}
+						
 					} catch (Exception e) {
-						// TODO: handle exception
+						System.err.println("FILEUPLOADSERVLET: Exception when writing temp file.");
+						e.printStackTrace();
 					}
 					
 					
-					// send over socket
+					int pageSize = 1024;
+					byte[] buffer = new byte[pageSize];
 					
 					DataOutputStream out = new DataOutputStream(client.getSocket().getOutputStream());
-					BufferedInputStream bis = new BufferedInputStream(new FileInputStream(tempFile));
+					System.out.println("FILEUPLOADSERVLET: BufferedInputStream opening on temp file :  " + tempdir + File.separator + filename);
+					BufferedInputStream bis = new BufferedInputStream(new FileInputStream(tempdir + File.separator + filename));
 					
+					// buffered output stream for saving file locally for testing
+					// BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream("C:\\upload\\received\\"+"\\"+username+"\\"+filename.substring(0,filename.length()-5)));
 					
-					int fourKBpage = 4096;
-					byte[] b = new byte[fourKBpage];
+					int bytesRead = 0;
+					int bytesLeft = (int) part.getSize();
 					
-					
-					while( bis.read() > -1) {
-						out.write(b);
+					while( (bytesRead = bis.read(buffer, 0, Math.min(pageSize, bytesLeft))) > 0 ) {
+						
+						// print bytes in buffer to console for testing
+						// for(byte c : buffer) {
+						// 	System.out.print((char) c);
+						// }
+						
+						// write file locally
+						// bos.write(buffer, 0 , bytesRead);
+						
+						// send file over socket
+						out.write(buffer, 0 , bytesRead);
+						bytesLeft -= bytesRead;
 					}
 					
+					System.out.println("FILEUPLOADSERVLET: Done sending file to UAServer.");
 					
-					// delete temporary file????
+						// this method says it reads all bytes from an input stream and transfers 
+						// them to the output stream. possibly use instead of writing to a temp file 
+						// then transferring?
+						
+						//bis.transferTo(out);
 
 					
-					// close streams
-					out.close();
+					// ************************************************************************************
+					// can't close output stream without getting a 'socket closed' exception on next upload
+					// ************************************************************************************
+					// out.close();
+					// bos.close();
 					bis.close();
+					
+					// delete temporary file
+					tempFile.delete();
+					System.out.println("FILEUPLOADSERVLET: Deleted temp file.");
 
 					return true;
 				}
@@ -163,7 +204,7 @@ public class FileUploadServlet extends HttpServlet {
 			
 			return true;
 		} catch (IllegalStateException | IOException | ServletException e) {
-			// IllegalStateException is thrown when file is >20MB (the value that is set above)
+			// IllegalStateException is thrown when file is >100MB (the value that is set above)
 			e.printStackTrace();
 			return false;
 		}
