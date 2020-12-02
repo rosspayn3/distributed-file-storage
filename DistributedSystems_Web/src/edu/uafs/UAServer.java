@@ -99,121 +99,143 @@ public class UAServer {
 
 				String line;
 				while ((line = serverIn.readLine()) != null) {
+					
 					if (line.equals("file server connected")) {
+						
 						log("A file server has connected");
 						fileServers.add(new SimpleEntry<>(socket, serverOut));
+						
 					} else if (line.equals("client connected")) {
+						
 						log("A client has connected.");
 						clients.put(socket.toString(), serverOut);
+						
 					} else if (line.contains("distribute~")) {
+						
                         String filename = line.split("~")[1];
+                        
                         synchronized (distributor.serverResponses) {
                             distributor.serverResponses.put(socket.getPort(), filename);
                         }
+                        
                     } else {
 						// handle response from file server
+                    	
 						if (line.contains("F|")) {
+							
                             synchronized(messageQueue) {
                                 messageQueue.offer(line);
                             }
+                            
 						} else {
 							// handle response from client
+							
 							log(String.format("%s :  %s", socket.toString(), line));
 							String[] cmdArgs = line.split(" ");
-							if (cmdArgs.length == 2) {
+							
 
-								String command = cmdArgs[0].toLowerCase().trim();
-								String parameter = cmdArgs[1].trim();
+							String command = cmdArgs[0].toLowerCase().trim();
+							String parameter = cmdArgs[1].trim();
 
-								if (command.equals("list") && parameter.equalsIgnoreCase("all")) {
-									for (SimpleEntry<Socket, PrintWriter> entry : fileServers) {
-                                        PrintWriter p = entry.getValue();
-										p.format("%s~%s~%s%n", socket.toString(), command, parameter);
-									}
-								} else if (command.equals("add") || command.equals("remove") || command.equals("list")) {
-									if(fileServers.size() > 0) {
+							if (command.equals("list") && parameter.equalsIgnoreCase("all")) {
+								
+								for (SimpleEntry<Socket, PrintWriter> entry : fileServers) {
+                                    PrintWriter p = entry.getValue();
+									p.format("%s~%s~%s%n", socket.toString(), command, parameter);
+								}
+								
+							} else if (command.equals("add") || command.equals("remove") || command.equals("list")) {
+								
+								if(fileServers.size() > 0) {
+									
+                                    if (command.equals("add")) {
+                                    	log("Add command received. Adding file...");
+                                    	
+                                    	// add syntax: add {filename} {file size in bytes}
+										distributeFile(socket, this.currentUser, parameter, cmdArgs[2]);
 										
-                                        if (command.equals("add")) {
-                                        	
-                                        	
-                                        	// add syntax: add {username} {filename} {file size in bytes}
-											distributeFile(socket, this.currentUser, parameter, cmdArgs[2]);
-											
-                                        } else {
-                                            int hashCode = parameter.hashCode();
-                                            int serverNumber = Math.abs(hashCode % fileServers.size());
-                                            PrintWriter fsout = fileServers.get(serverNumber).getValue();
-                                            String messageToFileServer = String.format("%s~%s~%s", socket.toString(), command, parameter);
-                                            fsout.println(messageToFileServer);
-                                        }
-									} else {
-										log("Attempted '" + command + "' file operation with no available file servers.");
-										serverOut.println("No available file servers.");
-									}
-
+										log("Add command successfully executed!");
+										
+                                    } else {
+                                    	
+                                        int hashCode = parameter.hashCode();
+                                        int serverNumber = Math.abs(hashCode % fileServers.size());
+                                        PrintWriter fsout = fileServers.get(serverNumber).getValue();
+                                        String messageToFileServer = String.format("%s~%s~%s", socket.toString(), command, parameter);
+                                        fsout.println(messageToFileServer);
+                                        
+                                    }
+                                    
 								} else {
-									serverOut.println("Invalid command.");
+									
+									log("Attempted '" + command + "' file operation with no available file servers.");
+									serverOut.println("No available file servers.");
+									
 								}
-							} else if (cmdArgs.length == 3) {
+								
+								// end handle add/remove/list commands
+								
+							} else if (command.equals("register")){
 
-								if (cmdArgs[0].equals("register")){
+								// register syntax: register {username} {password}
+								String username = cmdArgs[1];
+								String password = cmdArgs[2];
 
-									// register syntax: register {username} {password}
-									String username = cmdArgs[1];
-									String password = cmdArgs[2];
-
-									log(String.format("Registering new user '%s'...", username));
-									if ( registerUser(serverIn, serverOut, username, password) ) {
-										serverOut.println("Register successful.");
-										log("Register successful.");
-									} else {
-										serverOut.println("Register failed.");
-										log("Register failed.");
-									}
-								} else if (cmdArgs[0].equals("login")){
-
-									// login syntax: login {username} {password}
-									String username = cmdArgs[1];
-									String password = cmdArgs[2];
-
-									if( cmdArgs[1] != null && users.containsKey(cmdArgs[1]) ) {
-
-										log(String.format("Logging in user '%s'...", username));
-										if( validateLogin(serverIn, serverOut, username, password) ) {
-											currentUser = username;
-											serverOut.println("Login successful.");
-											log("Login successful.");
-										} else {
-											serverOut.println("Login failed.");
-											log("Login failed.");
-										}
-									} else {
-										serverOut.println("Invalid username.");
-									}
-
+								log(String.format("Registering new user '%s'...", username));
+								if ( registerUser(serverIn, serverOut, username, password) ) {
+									serverOut.println("Register successful.");
+									log("Register successful.");
 								} else {
-									serverOut.println("Invalid command.");
+									serverOut.println("Register failed.");
+									log("Register failed.");
 								}
+									
+								// end handle register command
+									
+							} else if (command.equals("login")){
 
-							} else if (cmdArgs.length == 1){
-								if(cmdArgs[0].equals("whoami")) {
-									serverOut.println("Current user: " + currentUser);
+								// login syntax: login {username} {password}
+								String username = cmdArgs[1];
+								String password = cmdArgs[2];
+
+								if( cmdArgs[1] != null && users.containsKey(cmdArgs[1]) ) {
+
+									log(String.format("Logging in user '%s'...", username));
+									if( validateLogin(serverIn, serverOut, username, password) ) {
+										currentUser = username;
+										serverOut.println("Login successful.");
+										log("Login successful.");
+									} else {
+										serverOut.println("Login failed.");
+										log("Login failed.");
+									}
 								} else {
-									serverOut.println("Invalid command.");
+									serverOut.println("Invalid username.");
 								}
+								
+								// end handle login command
+							} else if(command.equals("whoami")) {
+								serverOut.println("Current user: " + currentUser);
 							} else {
 								serverOut.println("Invalid command.");
-								log(String.format("Invalid command: %s ", cmdArgs.toString()));
 							}
-						}
-					}
 
-//					log("Waiting for message from " + socket.toString());
-				}
+						
+							
+							
+						} // end handle client messages
+						
+					} // end if(line.contains("F|")
+					
+				} // end main while loop				
 
+				
+				
 				log(socket.toString() + " Client connection closed.");
 				closeConnection(socket, serverIn, serverOut);
 
+				
+				
 			} catch (SocketException ex) {
 				log(socket.toString() + " " + ex.getMessage());
 				handleSocketException(ex, this.socket, serverIn, serverOut);
@@ -369,35 +391,40 @@ public class UAServer {
 		log("````````````````````````````````````````````````````````````````````````````````````in distributeFile");
 		
 		try {
+			
 			int fourKBpage = 4096;
 			byte[] b = new byte[fourKBpage];
 
 			log("getting input/output streams");
-			DataInputStream clientIn = new DataInputStream(clientSocket.getInputStream());
-			BufferedReader br = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+			DataInputStream dataIn = new DataInputStream(clientSocket.getInputStream());
 
 			int bytesRead = 0;
 			int offset = Integer.parseInt(size);
 			
 			
-			log("getting server incides");
+			log("getting server indices");
 			int[] servers = getServerIndices(filename);
 			DataOutputStream server1 = new DataOutputStream(fileServers.get(servers[0]).getKey().getOutputStream());
 			DataOutputStream server2 = new DataOutputStream(fileServers.get(servers[1]).getKey().getOutputStream());
 
 			log("sending bytes...");
-			// maybe read from byte 0 to size instead of Mackey logic
-			while( (bytesRead = clientIn.read(b, 0, Math.min(fourKBpage, offset))) > 0){
+			// maybe read from byte 0 to {size} instead of Mackey logic
+			while( (bytesRead = dataIn.read(b, 0, Math.min(fourKBpage, offset))) > 0){
 				log(offset + " bytes left to send");
 				server1.write(b);
 				server2.write(b);
 				offset -= bytesRead;
 			}
 			
+			log("Successfully sent " + size + " bytes to each file server.");
+			log("file distributed to file servers");
+			
 			fileCount++;
 			userFiles.get(user).add(filename + "`" + servers[0] + "`" + servers[1]);
 
+			dataIn.close();
 			return true;
+			
 		} catch (Exception e) {
 			e.printStackTrace();
 			return false;

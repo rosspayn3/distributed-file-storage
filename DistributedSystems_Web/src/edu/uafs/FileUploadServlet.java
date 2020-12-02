@@ -1,9 +1,15 @@
 package edu.uafs;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Collection;
 
 import javax.servlet.ServletException;
@@ -21,6 +27,8 @@ import javax.servlet.http.Part;
 @MultipartConfig()
 public class FileUploadServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
+	
+	private static final File tempDir = new File("C:\\upload");
 
 	
 	/**
@@ -94,33 +102,55 @@ public class FileUploadServlet extends HttpServlet {
 	 */
 	private boolean upload(HttpServletRequest request, WebClient client) {
 		
-		
+			
 		
 		try {
 			
 			for (Part part : request.getParts()) {
-				System.out.println(part.getSize());
+				
 				if(part.getSize() > (long) 1024 * 1024 * 100) {
 					return false;
 				}
 				
-				String filename = getFileName(part);
-				client.sendMessage("add " + filename + " " + part.getSize());
+//				String filename = getFileName(part);
+				String filename = Paths.get(part.getSubmittedFileName()).getFileName().toString().replace(" ", "-");
+				int size = (int) part.getSize();
+				
+				client.sendMessage( String.format("add %s %d", filename, part.getSize()) );
 				
 				try{
 					
-					DataOutputStream dos = new DataOutputStream(client.getSocket().getOutputStream());
-
+					// save temporary file
+					
+					File tempFile = new File(tempDir, filename);
+					
+					try {
+						Files.copy(part.getInputStream(), tempFile.toPath());
+					} catch (Exception e) {
+						// TODO: handle exception
+					}
+					
+					
+					// send over socket
+					
+					DataOutputStream out = new DataOutputStream(client.getSocket().getOutputStream());
+					BufferedInputStream bis = new BufferedInputStream(new FileInputStream(tempFile));
+					
+					
 					int fourKBpage = 4096;
 					byte[] b = new byte[fourKBpage];
-
-					BufferedInputStream bis = new BufferedInputStream(part.getInputStream());
-
-					while(  bis.read(b) > 0){
-						dos.write(b);
+					
+					
+					while( bis.read() > -1) {
+						out.write(b);
 					}
+					
+					
+					// delete temporary file????
 
-					dos.close();
+					
+					// close streams
+					out.close();
 					bis.close();
 
 					return true;
