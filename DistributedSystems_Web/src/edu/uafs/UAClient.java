@@ -6,10 +6,7 @@
 
 package edu.uafs;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.Socket;
 import java.net.SocketException;
 
@@ -58,6 +55,20 @@ public class UAClient {
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
+	}
+
+	private void uploadFile(Socket s) throws IOException {
+		DataOutputStream out = new DataOutputStream(s.getOutputStream());
+		int page = 4096;
+		byte[] b = new byte[page];
+		File file = new File("some_file");
+		long fileSize = file.length();
+		BufferedInputStream bis = new BufferedInputStream(new FileInputStream("file_from_web_client"));
+		while ((bis.read()) > 0) {
+			out.write(b);
+		}
+		out.close();
+		bis.close();
 	}
 	
 	private static class MessageReader implements Runnable {

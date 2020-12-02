@@ -12,14 +12,22 @@ import java.util.LinkedList;
 
 public class UAFile {
 
-	File file;
-	int fileID;
-	LinkedList<Socket> socketList = new LinkedList<>();
+	private File file;
+	private int fileID;
+	private LinkedList<Socket> socketList = new LinkedList<>();
 	
 	public UAFile(File file, int fileID, Socket socket) {
 		this.file = file;
 		this.fileID = fileID;
 		socketList.add(socket);
+	}
+
+	public File getFile(){
+		return this.file;
+	}
+
+	public int getFileId(){
+		return fileID;
 	}
 	
 	void addSocket(Socket socket) {
@@ -28,6 +36,14 @@ public class UAFile {
 	
 	public int hashCode() {
 		return fileID;
+	}
+
+	public boolean equals(UAFile file){
+		if(file.getFileId() == this.fileID){
+			return true;
+		}else{
+			return false;
+		}
 	}
 	
 }

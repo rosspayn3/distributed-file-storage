@@ -21,7 +21,6 @@ public class WebClient {
 	
 	Socket socket;
 	PrintWriter clientOut;
-	OutputStream outputStream;
 	BufferedReader clientIn;
 	
 	public WebClient(HttpSession session, JspWriter out) {
@@ -29,7 +28,6 @@ public class WebClient {
 		try {
 			this.socket = new Socket("127.0.0.1", 54320);
 			this.clientOut = new PrintWriter(socket.getOutputStream(), true);
-			this.outputStream = socket.getOutputStream();
 			this.clientIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 			clientOut.println("client connected");
 			getServerResponse();
@@ -118,10 +116,21 @@ public class WebClient {
 		}
 	}
 	
-	public boolean addFile(String file) {
+	public boolean sendFile(String file) {
 		
 		try {
-			// send file using output stream
+			
+			// send 'add' command (or just start writing bytes to output stream)
+			
+			// maybe wait for 'ready' message from file server before transferring?
+			
+			// wait for success message after transfer is complete
+			
+			// return true/false
+			
+			
+			
+			// this works with the String storage system we have now
 			clientOut.println("add " + file);
 			String response = getServerResponse();
 			// consume extra success message from second file server 

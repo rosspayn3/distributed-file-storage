@@ -1,5 +1,8 @@
 package edu.uafs;
 
+import java.io.BufferedInputStream;
+import java.io.DataOutputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Collection;
 
@@ -15,13 +18,7 @@ import javax.servlet.http.Part;
  * Servlet implementation class FileUploadServlet
  */
 @WebServlet("/fileupload")
-@MultipartConfig(
-		
-		// 20MB max file size (servlet breaks if a file is larger than this. need to troubleshoot.)
-		maxFileSize = 1024 * 1024 * 20,
-		// 110MB max request size, should allow 5 files at once (plus some overhead)
-		maxRequestSize = 1024 * 1024 * 110
-)
+@MultipartConfig()
 public class FileUploadServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 
@@ -33,7 +30,11 @@ public class FileUploadServlet extends HttpServlet {
 
 		try {
 			
-			boolean success = save(request);
+			WebClient client = (WebClient) request.getSession(false).getAttribute("client");
+			
+//			boolean success = save(request);
+			
+			boolean success = upload(request, client);
 			
 			if( success ) {
 				request.setAttribute("successmsg", "File(s) uploaded successfully!");
@@ -49,7 +50,7 @@ public class FileUploadServlet extends HttpServlet {
 		}
 		
 		// forward to upload.jsp with error/success message
-		request.getRequestDispatcher("upload.jsp").forward(request, response);
+		request.getRequestDispatcher("fileupload.jsp").forward(request, response);
 		
 	}
 	
@@ -61,6 +62,9 @@ public class FileUploadServlet extends HttpServlet {
 		
 	}
 	
+	/*
+	 *  Saves a file locally
+	 */
 	private boolean save(HttpServletRequest request) {
 		
 		try {
@@ -74,6 +78,57 @@ public class FileUploadServlet extends HttpServlet {
 				// will need to change directory if running on Linux
 				part.write("C:\\upload\\" + username + "-" + filename);
 				System.out.printf("File '%s' saved to C:\\upload\\\n", filename);
+		    }
+			
+			return true;
+		} catch (IllegalStateException | IOException | ServletException e) {
+			// IllegalStateException is thrown when file is >20MB (the value that is set above)
+			e.printStackTrace();
+			return false;
+		}
+		
+	}
+	
+	/*
+	 *  Sends a file to the UAServer
+	 */
+	private boolean upload(HttpServletRequest request, WebClient client) {
+		
+		
+		
+		try {
+			
+			for (Part part : request.getParts()) {
+				System.out.println(part.getSize());
+				if(part.getSize() > (long) 1024 * 1024 * 100) {
+					return false;
+				}
+				
+				String filename = getFileName(part);
+				client.sendMessage("add " + filename + " " + part.getSize());
+				
+				try{
+					
+					DataOutputStream dos = new DataOutputStream(client.getSocket().getOutputStream());
+
+					int fourKBpage = 4096;
+					byte[] b = new byte[fourKBpage];
+
+					BufferedInputStream bis = new BufferedInputStream(part.getInputStream());
+
+					while(  bis.read(b) > 0){
+						dos.write(b);
+					}
+
+					dos.close();
+					bis.close();
+
+					return true;
+				}
+				catch(Exception e){
+					e.printStackTrace();
+					return false;
+				}
 		    }
 			
 			return true;
