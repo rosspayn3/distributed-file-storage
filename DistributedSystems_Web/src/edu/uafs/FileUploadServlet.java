@@ -132,6 +132,7 @@ public class FileUploadServlet extends HttpServlet {
 				try{
 					
 					// save part as temporary file
+					// will need to update tempdir once this is running on Linux
 					File tempFile = new File(tempdir, filename);
 					
 					try {
@@ -171,16 +172,17 @@ public class FileUploadServlet extends HttpServlet {
 						
 						// send file over socket
 						out.write(buffer, 0 , bytesRead);
+						
 						bytesLeft -= bytesRead;
 					}
 					
 					System.out.println("FILEUPLOADSERVLET: Done sending file to UAServer.");
 					
-						// this method says it reads all bytes from an input stream and transfers 
-						// them to the output stream. possibly use instead of writing to a temp file 
-						// then transferring?
-						
-						//bis.transferTo(out);
+					// ******************************************************************************
+					// this method says it reads all bytes from an input stream and transfers them to 
+					// the output stream. possibly use this instead of the while loop above?
+					// ******************************************************************************
+					//bis.transferTo(out);
 
 					
 					// ************************************************************************************

@@ -386,6 +386,8 @@ public class UAServer {
 			DataOutputStream server2 = new DataOutputStream(fileServers.get(servers[1]).getKey().getOutputStream());
 			
 			// buffered output stream for saving file locally for testing
+			// directory needs to exist locally before this will work.
+			// need to write code for creating a directory if it doesn't exist.
 			BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream("C:\\upload\\received\\"+"\\"+user+"\\"+filename));
 			
 			log("Sending bytes...");
