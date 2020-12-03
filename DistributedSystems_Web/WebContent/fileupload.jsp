@@ -43,7 +43,7 @@ import="java.io.*, java.net.*, edu.uafs.WebClient"
 		
 	%>
 
-	<div class="container">
+	<div class="container mt-5">
 	
 		<h1 class="text-center">Welcome to the <span class="text-info">upload</span> page, <span class="text-info">${username}</span>!</h1>
 		<h4 class="text-center text-primary">Time to have some fun!</h4>
@@ -57,7 +57,7 @@ import="java.io.*, java.net.*, edu.uafs.WebClient"
 					 
 					<label for="fileupload">Choose a file:</label>
 					<input class="form-control-file" type="file" id="fileupload" name="file">
-					<p><small class="text-warning">*Max file size is 100MB</small></p>
+					<p><small class="text-warning">*Max file size is 200MB</small></p>
 					
 					<button class="mt-3 btn btn-primary" type="submit">UPLOAD</button>
 					
@@ -71,6 +71,7 @@ import="java.io.*, java.net.*, edu.uafs.WebClient"
 		<div>
 			<p class="mt-3 text-center text-success">${successmsg}</p>
 			<p class="mt-3 text-center text-danger">${errormsg}</p>
+			<p class="mt-3 text-center text-danger">${errordetails}</p>
 		</div>
 		
 		

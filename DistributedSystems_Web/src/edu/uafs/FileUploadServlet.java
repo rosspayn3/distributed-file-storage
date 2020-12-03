@@ -64,68 +64,27 @@ public class FileUploadServlet extends HttpServlet {
 		
 	}
 	
-	private String getFileName(Part part) {
-		
-		Collection<String> headers = part.getHeaders("content-disposition");
-		
-		// use this for built-in browser in Eclipse
-	    // return headers.toString().substring(headers.toString().lastIndexOf('\\') + 1, headers.toString().length()-2);
-		
-		// use this for chrome
-	    return Paths.get(part.getSubmittedFileName()).getFileName().toString();
-	    
-	}
 	
-	/*
-	 *  Saves a file locally
-	 */
-	private boolean save(HttpServletRequest request) {
-		
-		try {
-			String username = (String) request.getSession().getAttribute("username");
-			
-			for (Part part : request.getParts()) {
-				if(part.getSize() > (long) 1024 * 1024 * 20) {
-					return false;
-				}
-				String filename = getFileName(part);
-				// will need to change directory if running on Linux
-				part.write("C:\\upload\\" + username + "-" + filename);
-				System.out.printf("File '%s' saved to C:\\upload\\\n", filename);
-		    }
-			
-			return true;
-		} catch (IllegalStateException | IOException | ServletException e) {
-			// IllegalStateException is thrown when file is >20MB (the value that is set above)
-			e.printStackTrace();
-			return false;
-		}
-		
-	}
 	
 	/*
 	 *  Sends a file to the UAServer
 	 */
 	private boolean upload(HttpServletRequest request, WebClient client) {
 		
-			
-		
 		try {
 			
 			for (Part part : request.getParts()) {
 				
-				// check if file size over X
-				if(part.getSize() > (long) 1024 * 1024 * 100 /* 100 MB */) {
+				// check if file size over limit we set
+				if(part.getSize() > (long) 1024 * 1024 * 200 /* 200 MB */) {
+					request.setAttribute("errordetails", "File is larger than 200MB.");
 					return false;
 				}
 				
 				// get file name and replace spaces with '-'
 				String filename = getFileName(part).replace(" ", "-") + ".temp";
-				String username = (String) request.getSession().getAttribute("username");
 				
-				// number of bytes to send
-				int size = (int) part.getSize();
-				
+				// send 'add' command to server with filename and size
 				//                                              v----  remove .tmp extension  ----v
 				client.sendMessage( String.format("add %s %d", filename.substring(0, filename.length()-5), part.getSize()) );
 				
@@ -142,36 +101,31 @@ public class FileUploadServlet extends HttpServlet {
 						}
 						
 					} catch (Exception e) {
-						System.err.println("FILEUPLOADSERVLET: Exception when writing temp file.");
+						System.err.println("FILEUPLOADSERVLET: Temporary file already exists for attempted upload.");
 						e.printStackTrace();
 					}
 					
-					
-					int pageSize = 1024;
+					// number of bytes to send
+					int bytesLeft = (int) tempFile.length();
+					int pageSize = 4096;
 					byte[] buffer = new byte[pageSize];
+					int bytesRead = 0;
 					
-					DataOutputStream out = new DataOutputStream(client.getSocket().getOutputStream());
+					DataOutputStream dataOut = new DataOutputStream(client.getSocket().getOutputStream());
 					System.out.println("FILEUPLOADSERVLET: BufferedInputStream opening on temp file :  " + tempdir + File.separator + filename);
-					BufferedInputStream bis = new BufferedInputStream(new FileInputStream(tempdir + File.separator + filename));
+					BufferedInputStream fileIn = new BufferedInputStream(new FileInputStream(tempdir + File.separator + filename));
 					
 					// buffered output stream for saving file locally for testing
+					// String username = (String) request.getSession().getAttribute("username");
 					// BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream("C:\\upload\\received\\"+"\\"+username+"\\"+filename.substring(0,filename.length()-5)));
 					
-					int bytesRead = 0;
-					int bytesLeft = (int) part.getSize();
-					
-					while( (bytesRead = bis.read(buffer, 0, Math.min(pageSize, bytesLeft))) > 0 ) {
+					while( (bytesRead = fileIn.read(buffer, 0, Math.min(pageSize, bytesLeft))) > 0 ) {
 						
-						// print bytes in buffer to console for testing
-						// for(byte c : buffer) {
-						// 	System.out.print((char) c);
-						// }
-						
-						// write file locally
+						// write file locally for testing
 						// bos.write(buffer, 0 , bytesRead);
 						
 						// send file over socket
-						out.write(buffer, 0 , bytesRead);
+						dataOut.write(buffer, 0, Math.min(pageSize, bytesLeft));
 						
 						bytesLeft -= bytesRead;
 					}
@@ -190,7 +144,7 @@ public class FileUploadServlet extends HttpServlet {
 					// ************************************************************************************
 					// out.close();
 					// bos.close();
-					bis.close();
+					fileIn.close();
 					
 					// delete temporary file
 					tempFile.delete();
@@ -206,11 +160,23 @@ public class FileUploadServlet extends HttpServlet {
 			
 			return true;
 		} catch (IllegalStateException | IOException | ServletException e) {
-			// IllegalStateException is thrown when file is >100MB (the value that is set above)
+			// IllegalStateException is thrown when file is larger than max we set
 			e.printStackTrace();
 			return false;
 		}
 		
+	}
+	
+	private String getFileName(Part part) {
+		
+		Collection<String> headers = part.getHeaders("content-disposition");
+		
+		// use this for built-in browser in Eclipse
+	    // return headers.toString().substring(headers.toString().lastIndexOf('\\') + 1, headers.toString().length()-2);
+		
+		// use this for chrome
+	    return Paths.get(part.getSubmittedFileName()).getFileName().toString();
+	    
 	}
 
 }
