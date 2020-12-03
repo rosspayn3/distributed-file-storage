@@ -379,7 +379,7 @@ public class UAServer {
 	private static void log(String message) {
 
 		DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("MM/dd/yyyy hh:mm:ss.SS");
-		System.out.println(dateFormatter.format(LocalDateTime.now()) + " :  " + message);
+		System.out.println(dateFormatter.format(LocalDateTime.now()) + " MAIN SERVER :  " + message);
 
 	}
 
@@ -454,6 +454,11 @@ public class UAServer {
 		
 		try {
 			
+			//***************************************************************************************
+			// need to synchronize all of this such that a file server is only getting sent one 
+			// file's bytes at a time. don't want to mix two files' bytes together.
+			//***************************************************************************************
+			
 			int fileSize = Integer.parseInt(size);
 			int pageSize = 4096;
 			byte[] buffer = new byte[pageSize];
@@ -462,9 +467,16 @@ public class UAServer {
 			log("Size of file about to receive: " + bytesLeft);
 
 			DataInputStream dataIn = new DataInputStream(clientSocket.getInputStream());
+			
+			// need to send file servers the same 'add username filename size' command before sending bytes
 			int[] servers = getServerIndices(filename);
 			DataOutputStream server1 = new DataOutputStream(fileServers.get(servers[0]).getKey().getOutputStream());
 			DataOutputStream server2 = new DataOutputStream(fileServers.get(servers[1]).getKey().getOutputStream());
+			PrintWriter server1text = new PrintWriter(fileServers.get(servers[0]).getKey().getOutputStream());
+			PrintWriter server2text = new PrintWriter(fileServers.get(servers[0]).getKey().getOutputStream());
+			
+//			server1text.printf("add %s %s %s\n", user, filename, size);
+//			server2text.printf("add %s %s %s\n", user, filename, size);
 			
 			// buffered output stream for saving file locally for testing
 			// directory needs to exist locally before this will work.
@@ -472,6 +484,7 @@ public class UAServer {
 			BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream("C:\\upload\\received\\"+"\\"+user+"\\"+filename));
 			
 			log("Sending bytes...");
+			
 			
 			while( (bytesRead = dataIn.read(buffer, 0, Math.min(pageSize, bytesLeft))) > 0){
 				log("Should have read " + Math.min(pageSize, bytesLeft) + " bytes.");
