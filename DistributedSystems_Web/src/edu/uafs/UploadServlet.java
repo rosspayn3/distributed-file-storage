@@ -41,7 +41,7 @@ public class UploadServlet extends HttpServlet {
 		
 		try {
 			// transfer file to main server
-			client.addFile(text);
+			client.sendFile(text);
 			System.out.printf("UPLOAD SERVLET: Sent 'add %s' to main server\n", text);
 			request.setAttribute("successmsg", "File uploaded successfully!");
 		} catch (Exception e) {

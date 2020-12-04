@@ -53,7 +53,7 @@ public class LoginServlet extends HttpServlet {
 		
 		if(success) {
 			request.getSession().setAttribute("username", username);
-			request.getRequestDispatcher("upload.jsp").forward(request, response);
+			request.getRequestDispatcher("fileupload.jsp").forward(request, response);
 		} else {
 			request.setAttribute("errormsg", "<strong>Username or password is incorrect.</strong>");
 			request.setAttribute("username", username);
