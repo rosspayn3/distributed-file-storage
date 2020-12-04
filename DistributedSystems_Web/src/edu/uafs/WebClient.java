@@ -23,17 +23,19 @@ public class WebClient {
 	PrintWriter clientOut;
 	BufferedReader clientIn;
 	
+	
 	public WebClient(HttpSession session, JspWriter out) {
 		
 		try {
-			this.socket = new Socket("127.0.0.1", 54320);
+//			this.socket = new Socket("127.0.0.1", 54320);
+			this.socket = new Socket("127.0.0.1", 32122);
 			this.clientOut = new PrintWriter(socket.getOutputStream(), true);
 			this.clientIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 			clientOut.println("client connected");
 			getServerResponse();
 		} catch(Exception e) {
 			try {
-				out.print("<h1 class=\"text-danger text-center\"><strong>Exception</strong></h1>"
+				out.print("<h1 class=\"text-danger text-center mt-3\"><strong>Exception</strong></h1>"
 						+ "<p class=\"text-warning text-center mb-5\">Failed to establish socket connection to main server.</p>");
 			} catch (IOException e1) {
 				e1.printStackTrace();

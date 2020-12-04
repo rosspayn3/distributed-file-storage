@@ -11,6 +11,7 @@ import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -251,6 +252,8 @@ public class UAServer {
 
 		private void listUserFiles(String username, PrintWriter serverOut) {
 
+			// return list of files from userFiles HashMap instead of getting from file servers
+			
 			if (fileServers.size() == 0) {
 				log("Attempted \"list\" file operation with no available file servers.");
 				serverOut.println("No available file servers.");
@@ -481,7 +484,14 @@ public class UAServer {
 			// buffered output stream for saving file locally for testing
 			// directory needs to exist locally before this will work.
 			// need to write code for creating a directory if it doesn't exist.
-			BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream("C:\\upload\\received\\"+"\\"+user+"\\"+filename));
+			
+			File filesDir = new File("files" + File.separator + user);
+			
+			if(!filesDir.exists()) {
+				filesDir.mkdirs();
+			}
+			
+			BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(filesDir + File.separator +filename));
 			
 			log("Sending bytes...");
 			
@@ -564,6 +574,10 @@ public class UAServer {
 
     private static int[] getServerIndices(String filename) {
 		
+    	// assuming all even file servers on one machine and all odd # on other machine
+    	// server 1 = file count % number servers
+    	// server 2 = server 1 + 1    	
+    	
 		var reversedFilename = new StringBuilder();
 		
 		for (int i = filename.length() - 1; i >= 0; i--) {

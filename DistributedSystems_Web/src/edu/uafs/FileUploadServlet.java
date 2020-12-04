@@ -30,7 +30,7 @@ import javax.servlet.http.Part;
 public class FileUploadServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 	
-	private static final File tempdir = new File("C:\\upload");
+	private static File tempdir = new File("tempfiles");
 
 	
 	/**
@@ -73,6 +73,10 @@ public class FileUploadServlet extends HttpServlet {
 		
 		try {
 			
+			if(!tempdir.exists()) {
+				tempdir.mkdirs();
+			}
+			
 			for (Part part : request.getParts()) {
 				
 				// check if file size over limit we set
@@ -92,7 +96,7 @@ public class FileUploadServlet extends HttpServlet {
 					
 					// save part as temporary file
 					// will need to update tempdir once this is running on Linux
-					File tempFile = new File(tempdir, filename);
+					File tempFile = new File(tempdir + File.separator + filename);
 					
 					try {
 						// check if temporary file already exists from a previous failed upload
