@@ -404,10 +404,15 @@ public class UAServer {
 		log(String.format("Registering new user '%s'...", username));
 
 		try {
-			users.put(username, password);
-			userFiles.put(username, new ArrayList<String>());
-			serverOut.println("Register successful.");
-			log("Register successful.");
+			if(users.containsKey(username)) {
+				serverOut.println("username taken.");
+			} else {
+				users.put(username, password);
+				userFiles.put(username, new ArrayList<String>());
+				serverOut.println("Register successful.");
+				log("Register successful.");
+			}
+			
 		} catch(Exception e) {
 			e.printStackTrace();
 			serverOut.println("Register failed.");

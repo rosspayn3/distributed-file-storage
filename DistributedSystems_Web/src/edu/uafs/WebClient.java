@@ -14,6 +14,7 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.Socket;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import javax.servlet.jsp.JspWriter;
 
@@ -91,14 +92,21 @@ public class WebClient {
 		this.clientOut = writer;
 	}
 	
-	public boolean register(String username, String password) {
+	public boolean register(String username, String password, HttpServletRequest request) {
 		
+		boolean success = false;
 		try {
 			clientOut.println(String.format("register %s %s", username, password));
-			if(getServerResponse().contains("success")) {
-				return true;
-			} else {
-				return false;
+			String response = getServerResponse();
+			
+			if(response.contains("success")) {
+				success = true;
+			} else if (response.contains("taken")){
+				request.setAttribute("errordetails", "Username is taken. Try another username.");
+				success = false;
+			} else if (response.contains("failed")){
+				request.setAttribute("errordetails", "Exception in server. Complain about it to someone!");
+				success = false;
 			}
 		} catch (Exception e) {
 			System.err.println("WEBCLIENT: Exception in WebClient register method.");
@@ -106,6 +114,7 @@ public class WebClient {
 			return false;
 		}
 		
+		return success;
 	}
 	
 	public boolean login(String username, String password) {

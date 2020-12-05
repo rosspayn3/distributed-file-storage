@@ -50,7 +50,7 @@ public class RegistrationServlet extends HttpServlet {
 		WebClient client = (WebClient) request.getSession(false).getAttribute("client");
 		
 		if(password.equals(confirmpassword)) {
-			boolean success = client.register(username, password);
+			boolean success = client.register(username, password, request);
 			if(success) {
 				System.out.printf("REGISTRATION SERVLET: Sent 'register %s %s' to main server\n", username, password);
 				response.sendRedirect("login.jsp");
