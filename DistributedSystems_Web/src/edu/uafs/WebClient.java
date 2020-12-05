@@ -30,14 +30,14 @@ public class WebClient {
 			// this attempts to connect to the wrong port to simulate connection failure.
 			// code in .jsp pages should call the connect() method with the correct port on page refresh.
 			
-			this.socket = new Socket("127.0.0.1", 54320);
-			this.clientOut = new PrintWriter(socket.getOutputStream(), true);
-			this.clientIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-			clientOut.println("client connected");
-			getServerResponse();
+//			this.socket = new Socket("127.0.0.1", 54320);
+//			this.clientOut = new PrintWriter(socket.getOutputStream(), true);
+//			this.clientIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+//			clientOut.println("client connected");
+//			getServerResponse();
 			
 			// use this method once testing is complete
-//			connect(out);
+			connect(out);
 		} catch(Exception e) {
 			try {
 				out.print("<h1 class=\"text-danger text-center mt-3\"><strong>Exception</strong></h1>"
