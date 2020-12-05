@@ -33,14 +33,17 @@ import="java.io.*, java.net.*, edu.uafs.WebClient"
 	
 		// creates a new WebClient if this is the first time a user has opened a page.
 		// WebClient houses the functions to be called in the servlets.
-		if(session.getAttribute("client") == null){
-			WebClient client = new WebClient(session, out);
-			session.setAttribute("client", client);
+		WebClient client = (WebClient) session.getAttribute("client");
+		if( client == null ){
+			client = new WebClient(session, out);
+		} else if ( client.getSocket() == null){
+			client.connect(out);
 		}
+		session.setAttribute("client", client);
 		
 	%>
 
-	<div class="container">
+	<div class="container mt-3">
 	
 		<h1 class="text-center">Welcome to the <span class="text-info">registration</span> page!</h1>
 		<h4 class="text-center text-primary">Time to have some fun!</h4>

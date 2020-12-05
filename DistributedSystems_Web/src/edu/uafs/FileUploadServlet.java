@@ -90,7 +90,12 @@ public class FileUploadServlet extends HttpServlet {
 				
 				// send 'add' command to server with filename and size
 				//                                              v----  remove .tmp extension  ----v
-				client.sendMessage( String.format("add %s %d", filename.substring(0, filename.length()-5), part.getSize()) );
+				boolean proceed = client.sendAddFileCommand(filename.substring(0, filename.length()-5), part.getSize());
+				
+				if(!proceed) {
+					request.setAttribute("errordetails", "No available file servers.");
+					return false;
+				}
 				
 				try{
 					
@@ -173,12 +178,11 @@ public class FileUploadServlet extends HttpServlet {
 	
 	private String getFileName(Part part) {
 		
-		Collection<String> headers = part.getHeaders("content-disposition");
-		
 		// use this for built-in browser in Eclipse
+		//Collection<String> headers = part.getHeaders("content-disposition");
 	    // return headers.toString().substring(headers.toString().lastIndexOf('\\') + 1, headers.toString().length()-2);
 		
-		// use this for chrome
+		// use this for chrome (chromium-based) browsers
 	    return Paths.get(part.getSubmittedFileName()).getFileName().toString();
 	    
 	}

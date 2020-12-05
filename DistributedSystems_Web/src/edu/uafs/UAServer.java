@@ -159,10 +159,18 @@ public class UAServer {
 
 				switch (command) {
 					case "add":
-						log("Add command received. Distributing file to servers...");
-						// add syntax: add {filename} {file size in bytes}
-						distributeFile(socket, this.currentUser, parameter, cmdArgs[2]);
-						log("Add command successfully executed!");
+						if(fileServers.size() > 0) {
+							serverOut.println("accepted add command");
+							log("Add command received. Distributing file to servers...");
+							
+							// add syntax: add {filename} {file size in bytes}
+							distributeFile(socket, this.currentUser, parameter, cmdArgs[2]);
+							log("Add command successfully executed!");
+							
+						} else {
+							log("!! Attempted 'add' command with no available file servers.");
+							serverOut.println("no available file servers.");
+						}
 						break;
 					case "remove":
 						removeFile(parameter, cmdArgs[2], serverOut);
@@ -471,26 +479,24 @@ public class UAServer {
 
 			DataInputStream dataIn = new DataInputStream(clientSocket.getInputStream());
 			
-			// need to send file servers the same 'add username filename size' command before sending bytes
 			int[] servers = getServerIndices(filename);
 			DataOutputStream server1 = new DataOutputStream(fileServers.get(servers[0]).getKey().getOutputStream());
 			DataOutputStream server2 = new DataOutputStream(fileServers.get(servers[1]).getKey().getOutputStream());
 			PrintWriter server1text = new PrintWriter(fileServers.get(servers[0]).getKey().getOutputStream());
 			PrintWriter server2text = new PrintWriter(fileServers.get(servers[0]).getKey().getOutputStream());
 			
+			// send 'add {username} {filename} {size}' command to file servers so they can prepare to read bytes
 //			server1text.printf("add %s %s %s\n", user, filename, size);
 //			server2text.printf("add %s %s %s\n", user, filename, size);
 			
-			// buffered output stream for saving file locally for testing
-			// directory needs to exist locally before this will work.
-			// need to write code for creating a directory if it doesn't exist.
-			
 			File filesDir = new File("files" + File.separator + user);
 			
+			// create directory if it doesn't already exist
 			if(!filesDir.exists()) {
 				filesDir.mkdirs();
 			}
 			
+			// buffered output stream for saving file locally for testing
 			BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(filesDir + File.separator +filename));
 			
 			log("Sending bytes...");
@@ -521,6 +527,7 @@ public class UAServer {
 				log(bytesLeft + " bytes left to read.");
 			}
 			
+			log("Wrote file to " + filesDir.getAbsolutePath() + File.separator +filename);
 			log("Successfully sent " + NumberFormat.getNumberInstance(Locale.US).format(fileSize) + " bytes to each file server.");
 			
 			fileCount++;

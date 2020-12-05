@@ -16,6 +16,7 @@ import="java.io.*, java.net.*, edu.uafs.WebClient"
 <html>
 <head>
 	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+	<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 	<title>File Upload</title>
 	<meta charset="ISO-8859-1">
 	<style>
@@ -32,10 +33,14 @@ import="java.io.*, java.net.*, edu.uafs.WebClient"
 	
 		// creates a new WebClient if this is the first time a user has opened a page.
 		// WebClient houses the functions to be called in the servlets.
-		if(session.getAttribute("client") == null){
-			WebClient client = new WebClient(session, out);
-			session.setAttribute("client", client);
+		WebClient client = (WebClient) session.getAttribute("client");
+		if( client == null ){
+			client = new WebClient(session, out);
+		} else if ( client.getSocket() == null){
+			client.connect(out);
 		}
+		session.setAttribute("client", client);
+		
 		if(session.getAttribute("username") == null){
 			response.sendRedirect("login.jsp");	
 		}
@@ -43,20 +48,23 @@ import="java.io.*, java.net.*, edu.uafs.WebClient"
 		
 	%>
 
-	<div class="container mt-5">
+	<div class="container mt-3">
 	
 		<h1 class="text-center">Welcome to the <span class="text-info">upload</span> page, <span class="text-info">${username}</span>!</h1>
 		<h4 class="text-center text-primary">Time to have some fun!</h4>
 	
 		<!-- begin form container -->
-		<div class="mx-auto mt-5 text-center" style="width:300px">
+		<div class="mx-auto mt-5 text-center" style="max-width:500px">
 		
 			<form action="fileupload" method="POST" enctype="multipart/form-data">
 			 
 			 	<div class="form-group">
-					 
-					<label for="fileupload">Choose a file:</label>
-					<input class="form-control-file" type="file" id="fileupload" name="file">
+			 		<p>Choose a file:</p>
+					<div class="custom-file">
+						
+						<input class="custom-file-input" type="file" id="fileupload" name="file">
+						<label class="custom-file-label" for="fileupload"></label>
+					</div>
 					<p><small class="text-warning">*Max file size is 200MB</small></p>
 					
 					<button class="mt-3 btn btn-primary" type="submit">UPLOAD</button>
@@ -68,10 +76,13 @@ import="java.io.*, java.net.*, edu.uafs.WebClient"
 		</div>
 		<!-- end form container -->
 		
+		
+		<span class="my-3"></span>
+		
 		<div>
-			<p class="mt-3 text-center text-success">${successmsg}</p>
-			<p class="mt-3 text-center text-danger">${errormsg}</p>
-			<p class="mt-3 text-center text-danger">${errordetails}</p>
+			<p class="mt-2 text-center text-success">${successmsg}</p>
+			<p class="mt-2 text-center text-danger">${errormsg}</p>
+			<p class="mt-2 text-center text-danger">${errordetails}</p>
 		</div>
 		
 		
@@ -82,6 +93,14 @@ import="java.io.*, java.net.*, edu.uafs.WebClient"
 		
 		
 	</div>
+
+	<script>
+		// Add the following code if you want the name of the file appear on select
+		$(".custom-file-input").on("change", function() {
+			var fileName = $(this).val().split("\\").pop();
+			$(this).siblings(".custom-file-label").addClass("selected").html(fileName);
+		});
+	</script>
 
 </body>
 </html>

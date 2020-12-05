@@ -27,19 +27,50 @@ public class WebClient {
 	public WebClient(HttpSession session, JspWriter out) {
 		
 		try {
-//			this.socket = new Socket("127.0.0.1", 54320);
+			// this attempts to connect to the wrong port to simulate connection failure.
+			// code in .jsp pages should call the connect() method with the correct port on page refresh.
+			
+			this.socket = new Socket("127.0.0.1", 54320);
+			this.clientOut = new PrintWriter(socket.getOutputStream(), true);
+			this.clientIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+			clientOut.println("client connected");
+			getServerResponse();
+			
+			// use this method once testing is complete
+//			connect(out);
+		} catch(Exception e) {
+			try {
+				out.print("<h1 class=\"text-danger text-center mt-3\"><strong>Exception</strong></h1>"
+						+ "<p class=\"text-warning text-center\">Failed to establish socket connection to server."
+						+ "<br>Refresh the page, or close the browser window and open this page again to attempt to reconnect.</p>");
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+		}
+		
+	}
+	
+	public boolean connect(JspWriter out) {
+		
+		try {
 			this.socket = new Socket("127.0.0.1", 32122);
 			this.clientOut = new PrintWriter(socket.getOutputStream(), true);
 			this.clientIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 			clientOut.println("client connected");
 			getServerResponse();
-		} catch(Exception e) {
+			return true;
+		} catch (Exception e) {
+			
 			try {
 				out.print("<h1 class=\"text-danger text-center mt-3\"><strong>Exception</strong></h1>"
-						+ "<p class=\"text-warning text-center mb-5\">Failed to establish socket connection to main server.</p>");
+						+ "<p class=\"text-warning text-center\">Failed attempt to reconnect to server."
+						+ "<br>Refresh the page, or close the browser window and open this page again to attempt to reconnect.</p>");
 			} catch (IOException e1) {
 				e1.printStackTrace();
 			}
+			
+			e.printStackTrace();
+			return false;
 		}
 		
 	}
@@ -86,21 +117,20 @@ public class WebClient {
 				return false;
 			}
 		} catch (Exception e) {
-			System.err.println("WEBCLIENT: Exception in WebClient login method.");
+			System.err.println("!! WEBCLIENT: Exception in WebClient login method.\n");
 			e.printStackTrace();
 			return false;
 		}
 	}
 	
 	public boolean sendMessage(String msg) {
-		// We may or may not need this method. Just in case.
 		
 		try {
 			clientOut.println(msg);
 			System.out.println("WEBCLIENT: Sent '" + msg + "' to server.");
 			return true;
 		} catch (Exception e) {
-			System.err.println("WEBCLIENT: Exception in WebClient sendMessage method.");
+			System.err.println("!! WEBCLIENT: Exception in WebClient sendMessage method.\n");
 			e.printStackTrace();
 			return false;
 		}
@@ -113,10 +143,32 @@ public class WebClient {
 			System.out.println("WEBCLIENT: Response from server: " + response);
 			return response;
 		} catch (Exception e) {
-			System.err.println("Exception in WebClient getServerResponse method.");
+			System.err.println("!! WEBCLIENT: Exception in WebClient getServerResponse method.\n");
 			e.printStackTrace();
 			return null;
 		}
+	}
+	
+	public boolean sendAddFileCommand(String filename, long size) {
+		
+		boolean success = false;
+		
+		try {
+			
+			sendMessage( String.format("add %s %d", filename, size) );
+			String response = getServerResponse();
+			if(response.contains("accepted add command")) {
+				success = true;
+			} else if (response.contains("no available file servers")) {
+				success = false;
+			}
+			
+		} catch (Exception e) {
+			System.err.println("!! WEBCLIENT: Exception in WebClient sendAddFileCommand method.\n");
+		}
+		
+		return success;
+		
 	}
 	
 	public boolean sendFile(String file) {

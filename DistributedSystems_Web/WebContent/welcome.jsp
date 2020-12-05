@@ -40,7 +40,7 @@ import="java.io.*, java.net.*, edu.uafs.WebClient"
 		
 	%>
 
-	<div class="container">
+	<div class="container mt-3">
 	
 		<h1 class="text-center">Welcome, <span class="text-info">${username}</span>!</h1>
 		<h4 class="text-center text-primary">Time to have some fun!</h4>

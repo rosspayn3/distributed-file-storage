@@ -50,7 +50,7 @@ public class FileServer {
 		// IP address of main server
 		String host = "127.0.0.1";
 		// port main server is listening on
-		int port = 54320;
+		int port = 32122;
 		
 		Socket socket = new Socket(host, port);
 		BufferedReader fileServerIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -169,6 +169,7 @@ public class FileServer {
 				}
 			} catch (Exception e) {
 				log("Exception when attempting to create directory to receive file.");
+				e.printStackTrace();
 			}
 			
 			int fileSize = Integer.parseInt(size);
