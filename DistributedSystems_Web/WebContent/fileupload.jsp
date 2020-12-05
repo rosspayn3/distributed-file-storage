@@ -99,9 +99,7 @@ body {
 		<!-- end form container -->
 
 
-		<span class="my-3"></span>
-
-		<div>
+		<div class="mt-5"id="messages">
 			<p class="mt-2 text-center text-success">${successmsg}</p>
 			<p class="mt-2 text-center text-danger">${errormsg}</p>
 			<p class="mt-2 text-center text-danger">${errordetails}</p>

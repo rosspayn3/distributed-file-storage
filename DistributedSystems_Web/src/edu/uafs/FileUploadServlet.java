@@ -10,6 +10,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Collection;
@@ -28,9 +29,8 @@ import javax.servlet.http.Part;
 @WebServlet("/fileupload")
 @MultipartConfig()
 public class FileUploadServlet extends HttpServlet {
-	private static final long serialVersionUID = 1L;
 	
-	private static File tempdir = new File("tempfiles");
+	private static final long serialVersionUID = 1L;
 
 	
 	/**
@@ -44,7 +44,7 @@ public class FileUploadServlet extends HttpServlet {
 			
 //			boolean success = save(request);
 			
-			boolean success = upload(request, client);
+			boolean success = upload(request, response, client);
 			
 			if( success ) {
 				request.setAttribute("successmsg", "File(s) uploaded successfully!");
@@ -69,14 +69,10 @@ public class FileUploadServlet extends HttpServlet {
 	/*
 	 *  Sends a file to the UAServer
 	 */
-	private boolean upload(HttpServletRequest request, WebClient client) {
+	private boolean upload(HttpServletRequest request, HttpServletResponse response, WebClient client) {
 		
 		try {
-			
-			if(!tempdir.exists()) {
-				tempdir.mkdirs();
-			}
-			
+
 			for (Part part : request.getParts()) {
 				
 				// check if file size over limit we set
@@ -85,7 +81,7 @@ public class FileUploadServlet extends HttpServlet {
 					return false;
 				}
 				
-				// get file name and replace spaces with '-'
+				// get file name, replace spaces with '-', add .tmp extension in case we need it
 				String filename = getFileName(part).replace(" ", "-") + ".temp";
 				
 				// send 'add' command to server with filename and size
@@ -99,30 +95,15 @@ public class FileUploadServlet extends HttpServlet {
 				
 				try{
 					
-					// save part as temporary file
-					// will need to update tempdir once this is running on Linux
-					File tempFile = new File(tempdir + File.separator + filename);
-					
-					try {
-						// check if temporary file already exists from a previous failed upload
-						if(!tempFile.exists()) {
-							Files.copy(part.getInputStream(), tempFile.toPath());
-						}
-						
-					} catch (Exception e) {
-						System.err.println("FILEUPLOADSERVLET: Temporary file already exists for attempted upload.");
-						e.printStackTrace();
-					}
-					
 					// number of bytes to send
-					int bytesLeft = (int) tempFile.length();
+					int fileSize = (int) part.getSize();
+					int bytesLeft = fileSize;
 					int pageSize = 4096;
 					byte[] buffer = new byte[pageSize];
 					int bytesRead = 0;
 					
 					DataOutputStream dataOut = new DataOutputStream(client.getSocket().getOutputStream());
-					System.out.println("FILEUPLOADSERVLET: BufferedInputStream opening on temp file :  " + tempdir + File.separator + filename);
-					BufferedInputStream fileIn = new BufferedInputStream(new FileInputStream(tempdir + File.separator + filename));
+					BufferedInputStream fileIn = new BufferedInputStream(part.getInputStream());
 					
 					// buffered output stream for saving file locally for testing
 					// String username = (String) request.getSession().getAttribute("username");
@@ -139,25 +120,17 @@ public class FileUploadServlet extends HttpServlet {
 						bytesLeft -= bytesRead;
 					}
 					
-					System.out.println("FILEUPLOADSERVLET: Done sending file to UAServer.");
 					
 					// ******************************************************************************
 					// this method says it reads all bytes from an input stream and transfers them to 
 					// the output stream. possibly use this instead of the while loop above?
 					// ******************************************************************************
-					//bis.transferTo(out);
+//					fileIn.transferTo(dataOut);
+					
+					System.out.println("FILEUPLOADSERVLET: Done sending file to UAServer.");
+					
 
-					
-					// ************************************************************************************
-					// can't close output stream without getting a 'socket closed' exception on next upload
-					// ************************************************************************************
-					// out.close();
-					// bos.close();
 					fileIn.close();
-					
-					// delete temporary file
-					tempFile.delete();
-					System.out.println("FILEUPLOADSERVLET: Deleted temp file.");
 
 					return true;
 				}

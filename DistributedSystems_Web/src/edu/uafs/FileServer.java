@@ -45,7 +45,6 @@ public class FileServer {
 			log("Exception when attempting to create starting directory. Exiting...");
 			System.exit(1);
 		}
-		
 
 		// IP address of main server
 		String host = "127.0.0.1";
