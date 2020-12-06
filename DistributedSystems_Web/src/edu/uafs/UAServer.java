@@ -176,11 +176,19 @@ public class UAServer {
 						removeFile(parameter, cmdArgs[2], serverOut);
 						break;
 					case "list":
-						if (parameter.equalsIgnoreCase("all")) {
-							listAllFiles(command, parameter, socket, serverOut);
+						
+						if (fileServers.size() == 0) {
+							log("Attempted \"list\" file operation with no available file servers.");
+							serverOut.println("No available file servers.");
 						} else {
-							listUserFiles(cmdArgs[1], serverOut);
+							log("Listing files for user " + parameter);
+							if (parameter.equalsIgnoreCase("all")) {
+								listAllFiles(command, parameter, socket, serverOut);
+							} else {
+								listUserFiles(parameter, serverOut);
+							}
 						}
+						
 						break;
 					case "register":
 						registerUser(cmdArgs, serverOut);
@@ -259,38 +267,30 @@ public class UAServer {
 		}
 
 		private void listUserFiles(String username, PrintWriter serverOut) {
-
-			// return list of files from userFiles HashMap instead of getting from file servers
 			
-			if (fileServers.size() == 0) {
-				log("Attempted \"list\" file operation with no available file servers.");
-				serverOut.println("No available file servers.");
-				return;
-			}
-
-			ArrayList<String> userFileList = getUserFilenames(username);
-
-			if (userFileList == null || userFileList.size() == 0) {
-				serverOut.printf("Could not find any files belonging to user %s.%n", username);
+			ArrayList<String> userFileList;
+			
+			if(userFiles.containsKey(username)) {
+				userFileList = userFiles.get(username);
+				if(userFileList.size() > 0) {
+					serverOut.println("listing filenames");
+				} else {
+					serverOut.printf("Could not find any files belonging to user %s.\n", username);
+					return;
+				}
+			} else {
+				serverOut.printf("Could not find any files belonging to user %s.\n", username);
 				return;
 			}
 
 			for (String fileInfo : userFileList) {
 				String[] tokens = fileInfo.split("`");
-				int serverId = Integer.parseInt(tokens[1]);
-				var server = fileServers.get(serverId);
-				if (server != null) {
-					try {
-						var fsout = server.getValue();
-						fsout.printf("list~%s%n", username);
-					} catch (Exception ex) {
-						ex.printStackTrace();
-					}
-				} else {
-					log(String.format("Attempted to list files for user %s from file server %d, " +
-							"but server's entry in file server list was null.", username, serverId));
-				}
+				String filename = tokens[0];
+				
+				serverOut.println(filename);
 			}
+			
+			serverOut.println("done");
 		}
 
 		private void listAllFiles(String command, String parameter, Socket socket, PrintWriter serverOut) {
@@ -494,15 +494,15 @@ public class UAServer {
 //			server1text.printf("add %s %s %s\n", user, filename, size);
 //			server2text.printf("add %s %s %s\n", user, filename, size);
 			
-			File filesDir = new File("files" + File.separator + user);
+			File userDir = new File("files" + File.separator + user);
 			
 			// create directory if it doesn't already exist
-			if(!filesDir.exists()) {
-				filesDir.mkdirs();
+			if(!userDir.exists()) {
+				userDir.mkdirs();
 			}
 			
 			// buffered output stream for saving file locally for testing
-			BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(filesDir + File.separator +filename));
+			BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(userDir + File.separator +filename));
 			
 			log("Sending bytes...");
 			
@@ -532,7 +532,7 @@ public class UAServer {
 				log(bytesLeft + " bytes left to read.");
 			}
 			
-			log("Wrote file to " + filesDir.getAbsolutePath() + File.separator +filename);
+			log("Wrote file to " + userDir.getAbsolutePath() + File.separator +filename);
 			log("Successfully sent " + NumberFormat.getNumberInstance(Locale.US).format(fileSize) + " bytes to each file server.");
 			
 			fileCount++;

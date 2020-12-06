@@ -33,7 +33,7 @@ public class FileServer {
 		// final String path = args[0];
 		
 		// hard-coded starting directory for now
-		final String path = "C:\\files";
+		final String path = "files";
 		fileDirectory = new File(path);
 		
 		try {

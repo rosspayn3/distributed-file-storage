@@ -8,11 +8,10 @@ package edu.uafs;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.ArrayList;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
@@ -23,6 +22,8 @@ public class WebClient {
 	Socket socket;
 	PrintWriter clientOut;
 	BufferedReader clientIn;
+	ArrayList<String> filenames;
+	String username;
 	
 	
 	public WebClient(HttpSession session, JspWriter out) {
@@ -57,6 +58,7 @@ public class WebClient {
 			this.socket = new Socket("127.0.0.1", 32122);
 			this.clientOut = new PrintWriter(socket.getOutputStream(), true);
 			this.clientIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+			this.filenames = new ArrayList<String>();
 			clientOut.println("client connected");
 			getServerResponse();
 			return true;
@@ -92,6 +94,14 @@ public class WebClient {
 		this.clientOut = writer;
 	}
 	
+	public String getUsername() {
+		return username;
+	}
+	
+	public void setUsername(String username) {
+		this.username = username;
+	}
+	
 	public boolean register(String username, String password, HttpServletRequest request) {
 		
 		boolean success = false;
@@ -121,6 +131,7 @@ public class WebClient {
 		try {
 			clientOut.println(String.format("login %s %s", username, password));
 			if(getServerResponse().contains("success")) {
+				this.username = username;
 				return true;
 			} else {
 				return false;
@@ -178,6 +189,33 @@ public class WebClient {
 		
 		return success;
 		
+	}
+	
+	public ArrayList<String> listUserFiles(String username) {
+		
+		filenames.clear();
+		
+		try {
+			clientOut.printf("list %s\n", username);
+			
+			String response = getServerResponse();
+			
+			if(response.contains("listing filenames")) {
+				String filename;
+				while( !(filename = clientIn.readLine()).equals("done")) {
+					filenames.add(filename);
+				}
+			} else if (response.contains("Could not find any files") || response.contains("No available file servers")){
+				filenames.add("No files.");
+			} else {
+				filenames.add("Something went wrong.");
+			}
+		} catch (Exception e) {
+			System.err.println("!! WEBCLIENT: Exception in WebClient listUserFiles method.\n");
+			e.printStackTrace();
+		}
+		
+		return filenames;
 	}
 	
 	public boolean sendFile(String file) {
