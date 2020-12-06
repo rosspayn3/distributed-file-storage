@@ -472,7 +472,7 @@ public class UAServer {
 			DataInputStream dataIn = new DataInputStream(clientSocket.getInputStream());
 			
 			// need to send file servers the same 'add username filename size' command before sending bytes
-			int[] servers = getServerIndices(filename);
+			int[] servers = getServerIndices();
 			DataOutputStream server1 = new DataOutputStream(fileServers.get(servers[0]).getKey().getOutputStream());
 			DataOutputStream server2 = new DataOutputStream(fileServers.get(servers[1]).getKey().getOutputStream());
 			PrintWriter server1text = new PrintWriter(fileServers.get(servers[0]).getKey().getOutputStream());
@@ -572,29 +572,37 @@ public class UAServer {
 
 	}
 
-    private static int[] getServerIndices(String filename) {
+	/**
+	 * Gets the index of the servers on which to store an original and backup copy of a file.
+	 * The method assumes that servers are started in alternating fashion, which will lead
+	 * to files being evenly distributed across all virtual servers on all machines.
+	 * @return An array containing the indices of the primary and backup file-storage servers.
+	 */
+    private static int[] getServerIndices() {
 		
     	// assuming all even file servers on one machine and all odd # on other machine
     	// server 1 = file count % number servers
     	// server 2 = server 1 + 1    	
     	
-		var reversedFilename = new StringBuilder();
+    	int server1 = fileCount % fileServers.size();
+    	int server2 = server1 + 1;
 		
-		for (int i = filename.length() - 1; i >= 0; i--) {
-            reversedFilename.append(filename.charAt(i));
-        }
-		
-		int i1 = Math.abs(filename.hashCode() % fileServers.size());
-        int i2 = Math.abs(reversedFilename.toString().hashCode() % fileServers.size());
-		
-		if (i1 == i2) {
-            i2++;
-            if (i2 >= fileServers.size()) {
-                i2 = 0;
-            }
-        }
-		
-		return new int[] {i1, i2};
+		return new int[] {server1, server2};
+    }
+    
+    /**
+     * Generates two random numbers representing the servers on which to store the original
+     * and backup copies of a file.
+     * @return An array containing the indices of the primary and backup file-storage servers.
+     */
+    private static int[] getRandomServerIndices() {
+    	var rng = new java.util.Random();
+    	int server1 = rng.nextInt(fileServers.size());
+    	int server2;
+    	do {
+    		server2 = rng.nextInt(fileServers.size());
+    	} while (server2 == server1);
+    	return new int[] {server1, server2};
     }
 
 	private static class DispatcherService extends Thread {
@@ -655,7 +663,7 @@ public class UAServer {
                         }
                     }
                     for (String file : files.values()) {
-                        int[] indices = getServerIndices(file);
+                        int[] indices = getServerIndices();
                         var dest1 = fileServers.get(indices[0]);
                         var dest2 = fileServers.get(indices[1]);
                         dest1.getValue().printf("distributor~add~%s%n", file);
