@@ -43,6 +43,9 @@
 				<li class="nav-item active"><a class="nav-link text-info font-weight-bold" href="#">Upload<span class="sr-only">(current)</span></a></li>
 				<li class="nav-item"><a class="nav-link" href="files.jsp">Files</a></li>
 			</ul>
+			<ul class="navbar-nav ml-auto">
+				<li class="nav-item"><a class="nav-link text-primary font-weight-bold" href="logout.jsp">Logout</a></li>
+			</ul>
 		</div>
 	</nav>
 	

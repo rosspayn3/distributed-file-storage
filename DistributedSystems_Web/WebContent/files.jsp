@@ -28,23 +28,26 @@
 </head>
 <body>
 
-	
-	<nav class="navbar sticky-top navbar-expand-lg navbar-light bg-light">
+
+	<nav class="navbar navbar-inverse sticky-top navbar-expand-lg navbar-light bg-light">
 		<a class="navbar-brand" href="#">Group 10</a>
-		<button class="navbar-toggler" type="button" data-toggle="collapse"
-			data-target="#navbarNav" aria-controls="navbarNav"
-			aria-expanded="false" aria-label="Toggle navigation">
+		<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
 			<span class="navbar-toggler-icon"></span>
 		</button>
 		<div class="collapse navbar-collapse" id="navbarNav">
 			<ul class="navbar-nav">
 				<li class="nav-item"><a class="nav-link" href="login.jsp">Login</a></li>
 				<li class="nav-item"><a class="nav-link" href="register.jsp">Register</a></li>
-				<li class="nav-item"><a class="nav-link" href="fileupload.jsp">Upload<span class="sr-only">(current)</span></a></li>
+				<li class="nav-item"><a class="nav-link" href="fileupload.jsp">Upload</a></li>
 				<li class="nav-item active"><a class="nav-link text-info font-weight-bold" href="#">Files</a></li>
+			</ul>
+			<ul class="navbar-nav ml-auto">
+				<li class="nav-item"><a class="nav-link text-primary font-weight-bold" href="logout.jsp">Logout</a></li>
 			</ul>
 		</div>
 	</nav>
+
+	
 	
 	<%
 		// creates a new WebClient if this is the first time a user has opened a page.

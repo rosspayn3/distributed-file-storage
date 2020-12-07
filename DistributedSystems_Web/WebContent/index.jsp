@@ -43,7 +43,7 @@
 				<li class="nav-item"><a class="nav-link" href="register.jsp">Register</a></li>
 				<li class="nav-item"><a class="nav-link" href="fileupload.jsp">Upload</a></li>
 				<li class="nav-item"><a class="nav-link" href="files.jsp">Files</a></li>
-			</ul>
+			</ul>		
 		</div>
 	</nav>
 
@@ -57,6 +57,10 @@
 			client.connect(out);
 		}
 		session.setAttribute("client", client);
+		
+		if (session.getAttribute("username") != null) {
+			response.sendRedirect("files.jsp");
+		}
 		
 	%>
 
