@@ -114,7 +114,8 @@
 								out.print("<option>(none)</option>");
 							} else {
 								for(String filename : files){
-									out.print("<option>" + files.indexOf(filename) + " " + filename + "</option>");
+									//out.print("<option>" + files.indexOf(filename) + " | " + filename + "</option>");
+									out.print( String.format("<option>%-3d| %s", files.indexOf(filename), filename) );
 								}
 							}
 						%>

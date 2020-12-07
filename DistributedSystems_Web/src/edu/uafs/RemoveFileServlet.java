@@ -22,7 +22,7 @@ public class RemoveFileServlet extends HttpServlet {
 
 		WebClient client = (WebClient) request.getSession(false).getAttribute("client");
 		String input = request.getParameter("removefile");
-		String fileToRemove = input.substring(input.indexOf(" "));
+		String fileToRemove = input.substring(input.indexOf("| ") + 2);
 		
 		boolean success = client.sendRemoveFileCommand(fileToRemove);
 		
