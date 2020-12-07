@@ -173,7 +173,10 @@ public class UAServer {
 						}
 						break;
 					case "remove":
-						removeFile(parameter, cmdArgs[2], serverOut);
+						String username = parameter;
+						String filename = cmdArgs[2];
+						testRemoveFile(username, filename, serverOut);
+						//removeFile(parameter, cmdArgs[2], serverOut);
 						break;
 					case "list":
 						
@@ -204,6 +207,54 @@ public class UAServer {
 						break;
 				}
 			}
+		}
+		
+		private void testRemoveFile(String username, String filename, PrintWriter serverOut) {
+
+			if (fileServers.size() == 0) {
+				log("Attempted \"remove\" file operation with no available file servers.");
+				serverOut.println("No available file servers.");
+				return;
+			}
+
+			ArrayList<String> userFileList = getUserFilenames(username);
+			String fileInfo = null;
+			File userDir = new File("files" + File.separator + username);
+			int fileIndex = -1;
+
+			if (userFileList == null || userFileList.size() == 0 || !userDir.exists()) {
+				serverOut.printf("Could not find any files belonging to user %s.%n", username);
+				return;
+			}
+
+			for (int i = 0; i < userFileList.size() && fileInfo == null; i++) {
+				String s = userFileList.get(i);
+				int tick = s.indexOf('`');
+				if (tick != -1 && s.substring(0, tick).equals(filename)) {
+					fileIndex = i;
+					fileInfo = s;
+				}
+			}
+
+			if (fileInfo == null || fileIndex == -1) {
+				serverOut.printf("Could not find a file with name \"%s\" belonging to user %s.%n", filename, username);
+				return;
+			} else {
+				
+				File removeFile = new File(userDir + File.separator + filename);
+				serverOut.println("removing file");
+				
+				try {
+					log("Removing file " + removeFile.getAbsolutePath());
+					removeFile.delete();
+					userFiles.get(username).remove(fileIndex);
+				} catch(Exception e) {
+					log("Exception when removing file '" + removeFile.getAbsolutePath() + "'");
+					e.printStackTrace();
+				}
+				
+			}
+			
 		}
 
 		private void removeFile(String username, String filename, PrintWriter serverOut) {

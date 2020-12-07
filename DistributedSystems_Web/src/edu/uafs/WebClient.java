@@ -102,6 +102,14 @@ public class WebClient {
 		this.username = username;
 	}
 	
+	public void setFileNames(ArrayList<String> filenames) {
+		this.filenames = filenames;
+	}
+	
+	public ArrayList<String> getFileNames(){
+		return this.filenames;
+	}
+	
 	public boolean register(String username, String password, HttpServletRequest request) {
 		
 		boolean success = false;
@@ -185,6 +193,28 @@ public class WebClient {
 			
 		} catch (Exception e) {
 			System.err.println("!! WEBCLIENT: Exception in WebClient sendAddFileCommand method.\n");
+		}
+		
+		return success;
+		
+	}
+	
+	public boolean sendRemoveFileCommand(String filename) {
+		
+		boolean success = false;
+		
+		try {
+			
+			sendMessage( String.format("remove %s %s", this.username, filename) );
+			String response = getServerResponse();
+			if(response.contains("removing file")) {
+				success = true;
+			} else if (response.contains("Could not find") || response.contains("no available file servers")) {
+				success = false;
+			}
+			
+		} catch (Exception e) {
+			System.err.println("!! WEBCLIENT: Exception in WebClient sendRemoveFileCommand method.\n");
 		}
 		
 		return success;

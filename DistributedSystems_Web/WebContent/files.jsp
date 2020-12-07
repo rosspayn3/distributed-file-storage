@@ -101,7 +101,31 @@
 
 		</div>
 		<!-- end table container -->
-
+		
+		<div class="mx-auto mt-5 text-center" style="max-width: 500px">
+		
+			<form action="removefile" method="POST" >
+				<div class="form-group">
+				
+					<label for="exampleFormControlSelect1">Remove File:</label>
+					<select class="form-control" id="removefile" name="removefile">
+						<%
+							if( files.get(0).equals("No files.")){
+								out.print("<option>(none)</option>");
+							} else {
+								for(String filename : files){
+									out.print("<option>" + filename + "</option>");
+								}
+							}
+						%>
+					</select>
+					
+					<button class="mt-3 btn btn-primary" type="submit">REMOVE</button>
+					
+				</div>
+			</form>
+			
+		</div>
 
 		<div class="mt-5"id="messages">
 			<p class="mt-2 text-center text-success">${successmsg}</p>
