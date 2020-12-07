@@ -114,7 +114,7 @@
 								out.print("<option>(none)</option>");
 							} else {
 								for(String filename : files){
-									out.print("<option>" + filename + "</option>");
+									out.print("<option>" + files.indexOf(filename) + " " + filename + "</option>");
 								}
 							}
 						%>

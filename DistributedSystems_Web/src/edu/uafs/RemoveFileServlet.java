@@ -21,7 +21,8 @@ public class RemoveFileServlet extends HttpServlet {
 	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 
 		WebClient client = (WebClient) request.getSession(false).getAttribute("client");
-		String fileToRemove = request.getParameter("removefile");
+		String input = request.getParameter("removefile");
+		String fileToRemove = input.substring(input.indexOf(" "));
 		
 		boolean success = client.sendRemoveFileCommand(fileToRemove);
 		
@@ -29,10 +30,10 @@ public class RemoveFileServlet extends HttpServlet {
 		
 		if(success) {
 			request.setAttribute("successmsg", "<strong>File removed.</strong>");
-			request.getRequestDispatcher("fileupload.jsp").forward(request, response);
+			request.getRequestDispatcher("files.jsp").forward(request, response);
 		} else {
 			request.setAttribute("errormsg", "<strong>Something went wrong.</strong>");
-			request.getRequestDispatcher("login.jsp").forward(request, response);
+			request.getRequestDispatcher("files.jsp").forward(request, response);
 		}
 		
 	}
