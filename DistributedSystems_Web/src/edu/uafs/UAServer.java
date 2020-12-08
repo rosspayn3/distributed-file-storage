@@ -27,26 +27,60 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.locks.ReentrantLock;
 
-/*
-*	
-*/
+
+/**
+ * 
+ *  The main server of the LionDB distributed file storage system.
+ *  <p>
+ *  When started from a command line, syntax is {@code java UAServer [listen port] [# threads]}.
+ *
+ */
 public class UAServer {
 
+	/**
+	 * An {@link ArrayList} of currently connected {@link FileServer} nodes.
+	 */
 	private static ArrayList<Server> fileServers = new ArrayList<>();
+	
+	/**
+	 * 
+	 * 
+	 */
 	private static HashMap<Integer, Server> serverMap = new HashMap<>();
+	
+	/**
+	 * A {@link HashMap} containing currently connected clients and their output streams.
+	 */
 	private static HashMap<String, DataOutputStream> clients = new HashMap<>();
+	
+	/**
+	 * 
+	 * 
+	 */
 	private static LinkedList<String> messageQueue = new LinkedList<>();
-  	private static HashMap<String, String> users = new HashMap<>();
+	
+	/**
+	 * A {@link HashMap} containing usernames and passwords for login.
+	 */
+  	private static HashMap<String, String> userLogins = new HashMap<>();
+  	
+  	/**
+  	 * A {@link HashMap} containing file metadata such as file name and which {@link FileServer} the file 
+  	 * is located on.
+  	 */
 	private static HashMap<String, ArrayList<String>> userFiles = new HashMap<>();
 
+	/**
+	 * An integer that represents the total number of files added since the start of an 
+	 * instance of {@link UAServer}. This count is not decremented when a file is removed,
+	 * so it functions much like a primary key in a traditional DBMS.
+	 */
     private static int fileCount = 0;
 
 	public static void main (String[] args) throws Exception {
-		// args: portnumber and number of threads
-
 
 		if (args.length < 2) {
-			System.out.println("Invalid syntax:    java UAServer port nthreads");
+			System.out.println("Invalid syntax:    java UAServer [listen port] [# threads]");
 			System.exit(10);
 		}
 
@@ -68,12 +102,32 @@ public class UAServer {
 			threadPool.execute(t);
 		}
     }
-
+	
+	
+	/**
+	 * 
+	 * A thread that handles client interaction with UAServer. A {@link Socket} connection
+	 * is maintained with the client, along with a username to aid in storing, listing, 
+	 * and removing files for a specific user.
+	 *
+	 */
 	public static class UAClientThread implements Runnable {
 
+		/**
+		 * The socket connection between a UAClientThread and a client application.
+		 */
 		private Socket socket;
+		
+		/**
+		 * The current user of the client. The username is given by the client when it connects.
+		 */
 		private String currentUser = "none";
 
+		/**
+		 * Default constructor for {@link UAClientThread}.
+		 * 
+		 * @param socket	The {@link Socket} of the incoming client.
+		 */
 		public UAClientThread(Socket socket) {
 			this.socket = socket;
 		}
@@ -112,6 +166,13 @@ public class UAServer {
 			}
 		}
 
+		/**
+		 * Handles incoming connections from a {@link WebClient} or a {@link FileServer}.
+		 * 
+		 * @param eventString	Message that identifies a client or server that is connecting.
+		 * @param serverIn	The {@link BufferedInputStream} of the incoming {@link Socket} connection. 
+		 * @param serverOut	The {@link DataOutputStream} of the incoming {@link Socket} connection. 
+		 */
 		private void handleConnectionEvent(String eventString, BufferedInputStream serverIn, DataOutputStream serverOut) {
 			if (eventString.equals("file server connected")) {
 				Logger.log("MAIN SERVER", "A file server has connected");
@@ -126,6 +187,11 @@ public class UAServer {
 			}
 		}
 		
+		/**
+		 * 
+		 * 
+		 * 
+		 */
 		private void backupFile(BufferedReader r, BufferedInputStream in) throws Exception {
 			int destination = Integer.parseInt(r.readLine());
 			int fileSize = Integer.parseInt(r.readLine());
@@ -158,6 +224,14 @@ public class UAServer {
 			}
 		}
 
+		/**
+		 * Receives and executes a command from a {@link WebClient} or {@link FileServer}.
+		 * 
+		 * @param cmdText	The String that details the command and its parameters. 
+		 * @param socket	The {@link Socket} the command was received on.
+		 * @param serverIn	The {@link BufferedInputStream} of the {@link UAClientThread} that received the command.
+		 * @param serverOut	The {@link DataOutputStream} of the {@link UAClientThread} that received the command.
+		 */
 		private void parseAndExecuteCommand(String cmdText, Socket socket, BufferedInputStream serverIn, DataOutputStream serverOut) {
 			if (cmdText.contains("F|")) {
 				// queue message from file server to client
@@ -228,6 +302,16 @@ public class UAServer {
 			}
 		}
 
+		/**
+		 * Sends a command to remove a file to each {@link FileServer} node it is located on, then removes the file 
+		 * from the metadata stored in {@link UAServer}.
+		 * <p>
+		 * This method first sends a confirmation or error message to the {@link WebClient} in response to the command.
+		 * 
+		 * @param username	The user that is removing the file.
+		 * @param filename	The name of the file to be removed.
+		 * @param serverOut	The {@link DataOutputStream} of the {@link UAClientThread} that received the command.
+		 */
 		private void removeFile(String username, String filename, DataOutputStream serverOut) {
 
 			if (fileServers.size() == 0) {
@@ -321,6 +405,15 @@ public class UAServer {
 			
 		}
 
+		/**
+		 * Sends a list of the user's files to the {@link WebClient} that sent the command. File names are sent one
+		 * line at a time. 
+		 * <p>
+		 * This method first sends a confirmation or error message to the {@link WebClient} in response to the command.
+		 * 
+		 * @param username
+		 * @param serverOut
+		 */
 		private void listUserFiles(String username, DataOutputStream serverOut) {
 
 			if (fileServers.size() == 0) {
@@ -374,6 +467,16 @@ public class UAServer {
 			
 		}
 
+		/**
+		 * [NOT USED] 
+		 * 
+		 * This method sends a command to each currently connected {@link FileServer} node to list all files.
+		 * 
+		 * @param command
+		 * @param parameter
+		 * @param socket
+		 * @param serverOut
+		 */
 		private void listAllFiles(String command, String parameter, Socket socket, DataOutputStream serverOut) {
 
 			if (fileServers.size() == 0) {
@@ -399,6 +502,14 @@ public class UAServer {
 			}
 		}
 
+		/**
+		 * Handles user login.
+		 * <p>
+		 * This method sends a confirmation or error message to the {@link WebClient} in response to the command.
+		 * 
+		 * @param cmdArgs	A username and password.
+		 * @param serverOut	The {@link DataOutputStream} of the {@link UAClientThread} that received the command.
+		 */
 		private void executeLoginCommand(String[] cmdArgs, DataOutputStream serverOut) {
 			// login syntax: login {username} {password}
 			
@@ -409,7 +520,7 @@ public class UAServer {
 			String username = cmdArgs[1];
 			String password = cmdArgs[2];
 
-			if (username == null || !users.containsKey(username)) {
+			if (username == null || !userLogins.containsKey(username)) {
 				try {
 					serverOut.writeBytes("Invalid username.\n");
 					serverOut.flush();
@@ -442,6 +553,16 @@ public class UAServer {
 			Logger.log("MAIN SERVER", "Login successful.");
 		}
 
+		/**
+		 * Handles exceptions thrown by a {@link UAClientThread}'s {@link Socket}. The socket is closed inside this 
+		 * method. If the {@link Socket} was that of a {@link FileServer}'s {@link UAClientThread}, file redistribution 
+		 * occurs in order to prevent the loss of the last copy of a file.
+		 * 
+		 * @param ex	The {@link SocketException} that was thrown.
+		 * @param socket	The {@link Socket} that threw the exception.
+		 * @param serverIn	The {@link BufferedInputStream} of the {@link UAClientThread} that threw the exception.
+		 * @param serverOut	The {@link DataOutputStream} of the {@link UAClientThread} that threw the exception.
+		 */
 		private void handleSocketException(SocketException ex, Socket socket, BufferedInputStream serverIn, DataOutputStream serverOut) {
 
             if (ex.getMessage().equalsIgnoreCase("connection reset")) {
@@ -452,6 +573,13 @@ public class UAServer {
             }
 		}
 
+		/**
+		 * Closes the input stream, output stream, and {@link Socket} of a {@link UAClientThread}.
+		 * 
+		 * @param socket	The {@link Socket} to be closed.
+		 * @param serverIn	The {@link BufferedInputStream} of the {@link Socket} to be closed.
+		 * @param serverOut	The {@link DataOutputStream} of the {@link Socket} to be closed.
+		 */
 		private void closeConnection(Socket socket, BufferedInputStream serverIn, DataOutputStream serverOut) {
 
 			try {
@@ -468,6 +596,11 @@ public class UAServer {
 
 	}
 
+	/**
+	 * 
+	 * 
+	 * 
+	 */
 	private static void redistribute(Socket socket) {
 
 		int index = 0;
@@ -550,7 +683,15 @@ public class UAServer {
 	}
 
 
-
+	/**
+	 * Stores credentials for a new user in the current {@link UAServer}. A username cannot be registered if it already 
+	 * exists in the current instance of {@link UAServer}.
+	 * <p>
+	 * This method sends a success or error message to the {@link WebClient} in response to the command.
+	 * 
+	 * @param cmdArgs	The username and password of the new user.
+	 * @param serverOut	The {@link DataOutputStream} of the {@link UAClientThread} that received the command.
+	 */
 	private static void registerUser(String[] cmdArgs, DataOutputStream serverOut) {
 
 		String username = cmdArgs[1];
@@ -559,7 +700,7 @@ public class UAServer {
 		Logger.log("MAIN SERVER", String.format("Registering new user '%s'...", username));
 
 		try {
-			users.put(username, password);
+			userLogins.put(username, password);
 			userFiles.put(username, new ArrayList<String>());
 			serverOut.writeBytes("Register successful.\n");
 			serverOut.flush();
@@ -577,21 +718,47 @@ public class UAServer {
 
 	}
 
+	/**
+	 * Validates login credentials.
+	 * 
+	 * @param username The username sent by the {@link WebClient}.
+	 * @param password	The password sent by the {@link WebClient}.
+	 * @return	A boolean value indicating a successful validation of credentials.
+	 */
 	private static boolean validateLogin(String username, String password) {
 
-		if(users.get(username).equals(password)) {
+		if(userLogins.get(username).equals(password)) {
 			return true;
 		} else {
 			return false;
 		}
 
 	}
-	
+
+	/**
+	 * Returns the metadata for a user's files.
+	 * 
+	 * @param username	The username of a user.
+	 * @return	An {@link ArrayList} of the user's file metadata.
+	 */
 	private static ArrayList<String> getUserFilenames(String username){
 		return userFiles.get(username);
 	}
 
-	private static void distributeFile(BufferedInputStream dataIn, String user, String filename, String size) throws Exception {
+	/**
+	 * Reads a file's bytes in from a {@link UAClientThread}'s {@link BufferedInputStream}, then sends 
+	 * those bytes to one or more {@link FileServer} nodes where they are written to disk for permanent storage. 
+	 * If more than one {@link FileServer} node is available, a backup copy of the file is sent to a different 
+	 * {@link FileServer} node. The nodes are selected in such a way that files are distributed evenly among 
+	 * the available nodes.
+	 *  
+	 * @param dataIn	The {@link BufferedInputStream} to read a file from.
+	 * @param user		The user stored in the {@link UAClientThread} that is receiving the file.
+	 * @param filename	The name of the file to receive and distribute.
+	 * @param size		The size of the file, in bytes, to receive and distribute.
+	 * @throws IOException	When an exception occurs when reading a file's bytes from the {@link BufferedInputStream}.
+	 */
+	private static void distributeFile(BufferedInputStream dataIn, String user, String filename, String size) throws IOException  {
 
 		Logger.log("MAIN SERVER", "============= Distributing file to file servers =============");
 			
@@ -601,12 +768,6 @@ public class UAServer {
 		int[] servers = getServerIndices();
 		var server1 = fileServers.get(servers[0]);
 		var server2 = fileServers.get(servers[1]);
-		
-//		File filesDir = new File("files" + File.separator + user);
-		
-//		if(!filesDir.exists()) {
-//			filesDir.mkdirs();
-//		}
 		
 		String fileInfo = String.format("%s`%s`%d`%d", filename, user, server1.id, server2.id);
 		
@@ -652,6 +813,7 @@ public class UAServer {
 	 * Gets the index of the servers on which to store an original and backup copy of a file.
 	 * The method assumes that servers are started in alternating fashion, which will lead
 	 * to files being evenly distributed across all virtual servers on all machines.
+	 * 
 	 * @return An array containing the indices of the primary and backup file-storage servers.
 	 */
     private static int[] getServerIndices() {
@@ -669,6 +831,7 @@ public class UAServer {
     /**
      * Generates two random numbers representing the servers on which to store the original
      * and backup copies of a file.
+     * 
      * @return An array containing the indices of the primary and backup file-storage servers.
      */
     private static int[] getRandomServerIndices() {
