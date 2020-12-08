@@ -6,25 +6,22 @@
 
 package edu.uafs;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
-import java.text.NumberFormat;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
-import java.util.Locale;
 
 public class FileServer {
 
-	private static HashMap<String, String> files = new HashMap<>();
+	private static HashMap<String, UAFile> files = new HashMap<>();
 	private static File fileDirectory;
 	
 	public static void main(String[] args) throws IOException {
@@ -33,7 +30,7 @@ public class FileServer {
 		// final String path = args[0];
 		
 		// hard-coded starting directory for now
-		final String path = "C:\\files";
+		final String path = "files";
 		fileDirectory = new File(path);
 		
 		try {
@@ -42,7 +39,7 @@ public class FileServer {
 				fileDirectory.mkdirs();
 			}
 		} catch (Exception e) {
-			log("Exception when attempting to create starting directory. Exiting...");
+			Logger.log("FILE SERVER", "Exception when attempting to create starting directory. Exiting...");
 			System.exit(1);
 		}
 		
@@ -53,159 +50,156 @@ public class FileServer {
 		int port = 32122;
 		
 		Socket socket = new Socket(host, port);
-		BufferedReader fileServerIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-		PrintWriter fileServerOut = new PrintWriter(socket.getOutputStream(), true);
-		
-		fileServerOut.println("file server connected");
-		
-		// consume the connection message sent by the master server
-		log(fileServerIn.readLine());
-		
-		String line;
-		while ((line = fileServerIn.readLine()) != null) {
-			if (!line.equalsIgnoreCase("invalid command.") && !line.equals("connection test")) {
-				
-                System.out.format("Message received: %s%n", line);
-                
-                if (line.equals("distribute")) {
-                	
-                    StringBuilder sb = new StringBuilder();
-                    sb.append("distribute~");
-                    
-                    for (String file : files.keySet()) {
-                        sb.append(String.format("%s|", file));
-                    }
-                    
-                    sb.replace(sb.lastIndexOf("|"), sb.length(), "");
-                    log("Files being sent: " + sb.toString());
-                    fileServerOut.println(sb.toString());
-                    files.clear();
-                    
-                } else {
-                	
-                    String[] cmdArgs = line.split("~");
-                    String socketString = cmdArgs[0];
-                    String command = cmdArgs[1];
-                    String parameter = cmdArgs[2];
-                    
-                    switch(command) {
-                    
-	                    case "add":
-	                    	
-	                    	// add syntax: add {username} {filename} {size}
-	                        if (!files.containsKey(parameter)) {
-	                        	
-	                            files.put(parameter, parameter);
-	                            //receiveFile();
-	                            
-	                            if (socketString.equals("distributor")) {
-	                            	log(String.format("%s successfully re-inserted.", parameter));
-	                            } else {
-	                                fileServerOut.format("F|%s~%s successfully added to filesystem.%n", socketString, parameter);
-	                            }
-	                            
-	                        } else {
-	                        	
-	                            if (socketString.equals("distributor")) {
-	                                log(String.format("%s already exists in this server.", parameter));
-	                            } else {
-	                                fileServerOut.format("F|%s~ERROR: %s already exists in filesystem.%n", socketString, parameter);
-	                            }
-	                            
-	                        }
-	                        
-	                        break;
-	                        
-	                    case "remove":
-	                    	
-	                        if (files.containsKey(parameter)) {
-	                            files.remove(parameter);
-	                            fileServerOut.format("F|%s~%s successfully removed from filesystem.%n", socketString, parameter);
-	                        } else {
-	                            fileServerOut.format("F|%s~ERROR: %s not found in filesystem; nothing to remove.%n", socketString, parameter);
-	                        }
-	                        
-	                        break;
-	                        
-	                    case "list":
-	                    	
-	                        StringBuilder sb = new StringBuilder();
-	                        for (String file : files.keySet()) {
-	                            sb.append(String.format("F|%s~%s%n", socketString, file));
-	                        }
-	                        
-	                        fileServerOut.println(sb.toString());
-	                        
-	                        break;
-	                        
-	                    default:
-	                    	
-	                        fileServerOut.format("F|%s~Command [%s] not recognized.%n", socketString, command);
-	                        
-	                        break;
-	                        
-                    }
-                }
-			}
-		}
-	}
-	
-	private static void log(String message) {
-
-		DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("MM/dd/yyyy hh:mm:ss.SS");
-		System.out.println(dateFormatter.format(LocalDateTime.now()) + " FILE SERVER :  " + message);
-
-	}
-	
-	private static boolean receiveFile(Socket socket, String user, String filename, String size) {
+		BufferedReader commandIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+		BufferedInputStream fileServerIn = new BufferedInputStream(socket.getInputStream());
+		DataOutputStream fileServerOut = new DataOutputStream(socket.getOutputStream());
 		
 		try {
-			
-			File path = new File(fileDirectory + File.separator + user);
-			
-			try {
-				if(!path.exists()) {
-					path.mkdirs();
-				}
-			} catch (Exception e) {
-				log("Exception when attempting to create directory to receive file.");
-			}
-			
-			int fileSize = Integer.parseInt(size);
-			int pageSize = 4096;
-			byte[] buffer = new byte[pageSize];
-			int bytesRead = 0;
-			int bytesLeft = fileSize;
-			log("Size of file about to receive: " + bytesLeft);
-
-			DataInputStream dataIn = new DataInputStream(socket.getInputStream());
-			BufferedOutputStream bos = new BufferedOutputStream( new FileOutputStream(path + File.separator + filename) );
-			
-			log("Writing file to disk...");
-			
-			while( (bytesRead = dataIn.read(buffer, 0, Math.min(pageSize, bytesLeft))) > 0){
-				log("Should have read " + Math.min(pageSize, bytesLeft) + " bytes from DataInputStream.");
-				log("Read " + bytesRead + " bytes.");
-				
-				bos.write(buffer, 0, Math.min(pageSize, bytesLeft));
-				log("Wrote " + Math.min(pageSize, bytesLeft) + " to disk.");
-
-				bytesLeft -= bytesRead;
-				log(bytesLeft + " bytes left to read.");
-			}
-			
-			log("Successfully wrote " + NumberFormat.getNumberInstance(Locale.US).format(fileSize) + " bytes to disk.");
-
-			// don't close input stream here or socket exceptions happen when attempting to use it again.
-			bos.close();
-			
-			return true;
-		} catch (Exception e) {
-			e.printStackTrace();
-			return false;
+			fileServerOut.writeBytes("file server connected\n");
+			fileServerOut.flush();
+		} catch (IOException ex) {
+			Logger.log("FILE SERVER", ex.getMessage());
 		}
 		
+		String line;
+		while ((line = commandIn.readLine()) != null) {
+			
+			switch (line) {
+			case "add":
+				try {
+					addFile(commandIn, fileServerIn, fileServerOut);
+				} catch (IOException ex) {
+					Logger.log("FILE SERVER", String.format("Exception thrown while adding a file.%nDetails:%n%s%n%n", ex.getMessage()));
+				}
+				break;
+			case "backup":
+				try {
+					download(commandIn, fileServerIn, fileServerOut, true);
+				} catch (IOException ex) {
+					Logger.log("FILE SERVER", String.format("Exception thrown while backing up a file.%nDetails:%n%s%n%n", ex.getMessage()));
+				}
+				break;
+			case "download":
+				try {
+					download(commandIn, fileServerIn, fileServerOut, false);
+				} catch (IOException ex) {
+					Logger.log("FILE SERVER", String.format("Exception thrown while downloading a file.%nDetails:%n%s%n%n", ex.getMessage()));
+				}
+			case "remove":
+				try {
+					removeFile(commandIn);
+				} catch (IOException ex) {
+					Logger.log("FILE SERVER", String.format("Exception thrown while removing a file.%nDetails:%n%s%n%n", ex.getMessage()));
+				}
+				break;
+			}
+		}
 	}
 	
+	public static String readLine(BufferedInputStream in) throws IOException {
+		var sb = new StringBuilder();
+		char next;
+		while ((next = (char)in.read()) != '\n') {
+			sb.append(next);
+		}
+		return sb.toString();
+	}
 	
+	private static void addFile(BufferedReader r, BufferedInputStream in, DataOutputStream out) throws IOException {
+		int pageSize = 4096;
+		byte[] buffer = new byte[pageSize];
+		int bytesRead = 0;
+		String meta = r.readLine();
+		String[] tokens = meta.split(" ");
+		String user = tokens[0];
+		String filename = tokens[1];
+		String path = String.format("%s%s%s%s%s",
+				fileDirectory.getAbsolutePath(), File.separator, user, File.separator, filename); 
+		int fileSize = Integer.parseInt(tokens[2]);
+		int bytesLeft = fileSize;
+		
+		UAFile uaFile = new UAFile(filename, path, user, fileSize);
+		
+		if (files.containsKey(uaFile.getFileID())) {
+			return;
+		}
+		
+		File file = new File(path);
+		
+		// creates file if it doesn't exist or erases contents if it does
+		new PrintWriter(file).close();
+		
+		var bos = new BufferedOutputStream(new FileOutputStream(file, true));
+		
+		while ((bytesRead = in.read(buffer, 0, Math.min(pageSize, bytesLeft))) > 0) {
+			bos.write(buffer, 0, Math.min(pageSize, bytesLeft));
+			bytesLeft -= bytesRead;
+		}
+		
+		files.put(uaFile.getFileID(), uaFile);
+		
+		if (bos != null) {
+			bos.close();
+		}
+		
+		Logger.log("FILE SERVER", String.format("Successfully wrote file [%s] to disk.", filename));
+	}
+	
+	private static void download(BufferedReader r, BufferedInputStream in, DataOutputStream out, boolean backup) throws IOException {
+		String meta = r.readLine();
+		String[] tokens = meta.split(" ");
+		String key = String.format("%s:%s", tokens[1], tokens[0]);
+		String backDest = tokens[2];
+		UAFile uaFile = files.get(key);
+		
+		if (uaFile == null) {
+			return;
+		}
+		
+		File file = new File(uaFile.getPath());
+		
+		if (file == null || !file.exists()) {
+			return;
+		}
+		
+		int pageSize = 4096;
+		byte[] buffer = new byte[pageSize];
+		int bytesRead = 0;
+		int bytesLeft = uaFile.getSize();
+		BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file));
+
+		if (backup) {
+			out.writeBytes("backup\n");
+			out.writeBytes(backDest + "\n");
+			out.writeBytes(uaFile.getSize() + "\n");
+			out.writeBytes(tokens[0] + "\n");
+			out.writeBytes(tokens[1] + "\n");
+		} else {
+			out.writeBytes("download\n");
+			out.writeBytes(uaFile.getOwner() + "\n");
+			out.writeBytes(uaFile.getSize() + "\n");
+		}
+		
+		while ((bytesRead = bis.read(buffer, 0, Math.min(pageSize, bytesLeft))) > 0) {
+			out.write(buffer, 0, Math.min(pageSize, bytesLeft));
+			bytesLeft -= bytesRead;
+		}
+		
+		bis.close();
+		Logger.log("FILE SERVER", String.format("Successfully transferred file [%s].", uaFile.getFilename()));
+	}
+	
+	private static void removeFile(BufferedReader r) throws IOException {
+		String fileId = r.readLine();
+		UAFile uaFile = files.get(fileId);
+		
+		if (uaFile == null) {
+			return;
+		}
+		
+		File file = new File(uaFile.getPath());
+		if (!file.isDirectory() && file.delete()) {
+			files.remove(fileId);
+		}
+	}
 }

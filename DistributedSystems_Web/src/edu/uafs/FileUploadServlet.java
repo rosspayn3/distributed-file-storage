@@ -176,10 +176,10 @@ public class FileUploadServlet extends HttpServlet {
 		Collection<String> headers = part.getHeaders("content-disposition");
 		
 		// use this for built-in browser in Eclipse
-	    // return headers.toString().substring(headers.toString().lastIndexOf('\\') + 1, headers.toString().length()-2);
+	    return headers.toString().substring(headers.toString().lastIndexOf('\\') + 1, headers.toString().length()-2);
 		
 		// use this for chrome
-	    return Paths.get(part.getSubmittedFileName()).getFileName().toString();
+	    // return Paths.get(part.getSubmittedFileName()).getFileName().toString();
 	    
 	}
 

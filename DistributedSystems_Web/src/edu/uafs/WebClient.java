@@ -31,8 +31,8 @@ public class WebClient {
 			this.socket = new Socket("127.0.0.1", 32122);
 			this.clientOut = new PrintWriter(socket.getOutputStream(), true);
 			this.clientIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-			clientOut.println("client connected");
-			getServerResponse();
+			clientOut.print("client connected\n");
+			clientOut.flush();
 		} catch(Exception e) {
 			try {
 				out.print("<h1 class=\"text-danger text-center mt-3\"><strong>Exception</strong></h1>"
