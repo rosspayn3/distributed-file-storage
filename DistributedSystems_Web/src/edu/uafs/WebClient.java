@@ -60,7 +60,6 @@ public class WebClient {
 			this.clientIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 			this.filenames = new ArrayList<String>();
 			clientOut.println("client connected");
-			getServerResponse();
 			return true;
 		} catch (Exception e) {
 			
@@ -185,7 +184,7 @@ public class WebClient {
 			
 			sendMessage( String.format("add %s %d", filename, size) );
 			String response = getServerResponse();
-			if(response.contains("accepted add command")) {
+			if(response.contains("accepted")) {
 				success = true;
 			} else if (response.contains("no available file servers")) {
 				success = false;
@@ -209,7 +208,7 @@ public class WebClient {
 			String response = getServerResponse();
 			if(response.contains("removing file")) {
 				success = true;
-			} else if (response.contains("Could not find") || response.contains("no available file servers")) {
+			} else if (response.contains("Could not find") || response.contains("available file servers")) {
 				success = false;
 			}
 			
@@ -233,6 +232,7 @@ public class WebClient {
 			if(response.contains("listing filenames")) {
 				String filename;
 				while( !(filename = clientIn.readLine()).equals("done")) {
+					System.out.println("File name received: " + filename);
 					filenames.add(filename);
 				}
 			} else if (response.contains("Could not find any files") || response.contains("No available file servers")){
