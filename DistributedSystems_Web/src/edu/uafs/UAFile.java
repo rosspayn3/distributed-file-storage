@@ -12,38 +12,62 @@ import java.util.LinkedList;
 
 public class UAFile {
 
-	private File file;
-	private int fileID;
-	private LinkedList<Socket> socketList = new LinkedList<>();
+	private String filename;
+	private String path;
+	private String owner;
+	private int size;
+	private String fileID;
 	
-	public UAFile(File file, int fileID, Socket socket) {
-		this.file = file;
-		this.fileID = fileID;
-		socketList.add(socket);
+	public UAFile(String filename, String path, String owner, int size) {
+		this.filename = filename;
+		this.path = path;
+		this.owner = owner;
+		this.size = size;
+		fileID = String.format("%s:%s", owner, filename);
+	}
+	
+	public String getFilename() {
+		return filename;
+	}
+	
+	public void setFilename(String filename) {
+		this.filename = filename;
+	}
+	
+	public String getPath() {
+		return path;
+	}
+	
+	public void setPath(String path) {
+		this.path = path;
+	}
+	
+	public String getOwner() {
+		return owner;
+	}
+	
+	public void setOwner() {
+		this.owner = owner;
+	}
+	
+	public int getSize() {
+		return size;
+	}
+	
+	public void setSize(int size) {
+		this.size = size;
 	}
 
-	public File getFile(){
-		return this.file;
-	}
-
-	public int getFileId(){
+	public String getFileID(){
 		return fileID;
-	}
-	
-	void addSocket(Socket socket) {
-		socketList.add(socket);
 	}
 	
 	public int hashCode() {
-		return fileID;
+		return fileID.hashCode();
 	}
 
 	public boolean equals(UAFile file){
-		if(file.getFileId() == this.fileID){
-			return true;
-		}else{
-			return false;
-		}
+		return fileID.equals(file.getFileID());
 	}
 	
 }

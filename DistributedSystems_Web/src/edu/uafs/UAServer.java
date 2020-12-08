@@ -7,13 +7,9 @@
 package edu.uafs;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
@@ -21,31 +17,29 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.text.NumberFormat;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Locale;
-import java.util.AbstractMap.SimpleEntry;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.locks.ReentrantLock;
 
 /*
 *	
 */
 public class UAServer {
 
-	private static ArrayList<SimpleEntry<Socket, PrintWriter>> fileServers = new ArrayList<>();
-	private static HashMap<String, PrintWriter> clients = new HashMap<>();
+	private static ArrayList<Server> fileServers = new ArrayList<>();
+	private static HashMap<Integer, Server> serverMap = new HashMap<>();
+	private static HashMap<String, DataOutputStream> clients = new HashMap<>();
 	private static LinkedList<String> messageQueue = new LinkedList<>();
   	private static HashMap<String, String> users = new HashMap<>();
-  								   			// v---  filename`server1`server2
 	private static HashMap<String, ArrayList<String>> userFiles = new HashMap<>();
 
-
     private static int fileCount = 0;
-    private static FileDistributor distributor = new FileDistributor();
 
 	public static void main (String[] args) throws Exception {
 		// args: portnumber and number of threads
@@ -59,8 +53,7 @@ public class UAServer {
 		int port = Integer.parseInt(args[0]);
 		int nthreads = Integer.parseInt(args[1]);
 
-		DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("MM/dd/yyyy hh:mm:ss.SS");
-		System.out.println(dateFormatter.format(LocalDateTime.now()) +" :  Server is now running on port " + port);
+		Logger.print("MAIN SERVER", "Server is now running on port " + port);
 		ServerSocket server = new ServerSocket(port);
 
 		// create a thread pool of size nthreads
@@ -68,8 +61,6 @@ public class UAServer {
 
 		DispatcherService dispatcher = new DispatcherService();
 		dispatcher.start();
-
-        distributor.start();
 
 		while (true) {
 			Socket socket = server.accept();
@@ -89,60 +80,85 @@ public class UAServer {
 
 		@Override
 		public void run() {
-            log("New connection established: " + socket.toString());
-            BufferedReader serverIn = null;
-            PrintWriter serverOut = null;
+            Logger.log("MAIN SERVER", "New connection established: " + socket.toString());
+            BufferedReader commandReader = null;
+            BufferedInputStream serverIn = null;
+            DataOutputStream serverOut = null;
 			try {
-				serverIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-				serverOut = new PrintWriter(socket.getOutputStream(), true);
-
-				DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("MM/dd/yyyy hh:mm:ss.SS");
-				serverOut.println("Connected to main server on " + dateFormatter.format(LocalDateTime.now()));
+				commandReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+				serverIn = new BufferedInputStream(socket.getInputStream());
+				serverOut = new DataOutputStream(socket.getOutputStream());
 
 				String line;
-				while ((line = serverIn.readLine()) != null) {
+				while ((line = commandReader.readLine()) != null) {
 					
 					if (line.contains("connected")) {
-						handleConnectionEvent(line, serverOut);
-					} else if (line.contains("distribute~")) {
-						startFileDistribution(line, socket.getPort());
+						handleConnectionEvent(line, serverIn, serverOut);
+					} else if (line.contains("backup")) {
+						backupFile(commandReader, serverIn);
                     } else {
 						parseAndExecuteCommand(line, socket, serverIn, serverOut);
 					}
 				}
 
-				log(socket.toString() + " Client connection closed.");
+				Logger.log("MAIN SERVER", socket.toString() + " Client connection closed.");
 				closeConnection(socket, serverIn, serverOut);
 
 			} catch (SocketException ex) {
-				log(socket.toString() + " " + ex.getMessage());
+				Logger.log("MAIN SERVER", socket.toString() + " " + ex.getMessage());
 				handleSocketException(ex, this.socket, serverIn, serverOut);
             } catch (Exception ex) {
 				ex.printStackTrace();
 			}
 		}
 
-		private void handleConnectionEvent(String eventString, PrintWriter serverOut) {
+		private void handleConnectionEvent(String eventString, BufferedInputStream serverIn, DataOutputStream serverOut) {
 			if (eventString.equals("file server connected")) {
-				log("A file server has connected");
-				fileServers.add(new SimpleEntry<>(socket, serverOut));
+				Logger.log("MAIN SERVER", "A file server has connected");
+				Server s = new Server(socket, serverIn, serverOut);
+				fileServers.add(s);
+				serverMap.put(s.id, s);
 			} else if (eventString.equals("client connected")) {
-				log("A client has connected.");
+				Logger.log("MAIN SERVER", "A client has connected.");
 				clients.put(socket.toString(), serverOut);
 			} else {
-				log(String.format("Unhandled connection string detected: \"%s\" - cannot process.", eventString));
+				Logger.log("MAIN SERVER", String.format("Unhandled connection string detected: \"%s\" - cannot process.", eventString));
+			}
+		}
+		
+		private void backupFile(BufferedReader r, BufferedInputStream in) throws Exception {
+			int destination = Integer.parseInt(r.readLine());
+			int fileSize = Integer.parseInt(r.readLine());
+			String filename = r.readLine();
+			String username = r.readLine();
+			Server server = fileServers.get(destination);
+			Exception exception = null;
+			
+			try {
+				server.lock();
+				server.sendCommand("add");
+				server.sendCommand(String.format("%s %s %d", username, filename, fileSize));
+				int pageSize = 4096;
+				byte[] buffer = new byte[pageSize];
+				int bytesRead = 0;
+				int bytesLeft = fileSize;
+				while (bytesLeft > 0 && (bytesRead = in.read(buffer)) > 0) {
+					server.sendBytes(buffer, 0, Math.min(pageSize, bytesLeft));
+					bytesLeft -= bytesRead;
+				}
+				Logger.log("MAIN SERVER", String.format("Successfully backed up file [%s] to server #%d.", filename, destination));
+			} catch (Exception ex) {
+				exception = ex;
+			} finally {
+				server.unlock();
+			}
+			
+			if (exception != null) {
+				throw exception;
 			}
 		}
 
-		private void startFileDistribution(String cmdText, int port) {
-			String filename = cmdText.split("~")[1];
-
-			synchronized (distributor.serverResponses) {
-				distributor.serverResponses.put(port, filename);
-			}
-		}
-
-		private void parseAndExecuteCommand(String cmdText, Socket socket, BufferedReader serverIn, PrintWriter serverOut) {
+		private void parseAndExecuteCommand(String cmdText, Socket socket, BufferedInputStream serverIn, DataOutputStream serverOut) {
 			if (cmdText.contains("F|")) {
 				// queue message from file server to client
 				synchronized(messageQueue) {
@@ -151,7 +167,7 @@ public class UAServer {
 			} else {
 				// handle response from client
 
-				log(String.format("%s :  %s", socket.toString(), cmdText));
+				Logger.log("MAIN SERVER", String.format("%s :  %s", socket.toString(), cmdText));
 				String[] cmdArgs = cmdText.split(" ");
 
 				String command = cmdArgs[0].toLowerCase().trim();
@@ -159,10 +175,22 @@ public class UAServer {
 
 				switch (command) {
 					case "add":
-						log("Add command received. Distributing file to servers...");
+						Logger.log("MAIN SERVER", "Add command received. Distributing file to servers...");
 						// add syntax: add {filename} {file size in bytes}
-						distributeFile(socket, this.currentUser, parameter, cmdArgs[2]);
-						log("Add command successfully executed!");
+						try {
+							if(fileServers.size() == 0) {
+								serverOut.writeBytes("no available file servers.\n");
+								serverOut.flush();
+								break;
+							} else {
+								serverOut.writeBytes("accepted.\n");
+								serverOut.flush();
+								distributeFile(serverIn, this.currentUser, parameter, cmdArgs[2]);
+								Logger.log("MAIN SERVER", "Add command successfully executed!");
+							}
+						} catch (Exception ex) {
+							Logger.log("MAIN SERVER", "Exception thrown while distributing file.");
+						}
 						break;
 					case "remove":
 						removeFile(parameter, cmdArgs[2], serverOut);
@@ -181,20 +209,35 @@ public class UAServer {
 						executeLoginCommand(cmdArgs, serverOut);
 						break;
 					case "whoami":
-						serverOut.println("Current user: " + currentUser);
+						try {
+							serverOut.writeBytes(String.format("Current user: %s%n", currentUser));
+							serverOut.flush();
+						} catch (IOException ex) {
+							ex.printStackTrace();
+						}
 						break;
 					default:
-						serverOut.println("Invalid command.");
+						try {
+							serverOut.writeBytes("Invalid command.");
+							serverOut.flush();
+						} catch (IOException ex) {
+							ex.printStackTrace();
+						}
 						break;
 				}
 			}
 		}
 
-		private void removeFile(String username, String filename, PrintWriter serverOut) {
+		private void removeFile(String username, String filename, DataOutputStream serverOut) {
 
 			if (fileServers.size() == 0) {
-				log("Attempted \"remove\" file operation with no available file servers.");
-				serverOut.println("No available file servers.");
+				Logger.log("MAIN SERVER", "Attempted \"remove\" file operation with no available file servers.");
+				try {
+					serverOut.writeBytes("No available file servers.\n");
+					serverOut.flush();
+				} catch (IOException ex) {
+					ex.printStackTrace();
+				}
 				return;
 			}
 
@@ -202,23 +245,44 @@ public class UAServer {
 			String fileInfo = null;
 
 			if (userFileList == null || userFileList.size() == 0) {
-				serverOut.printf("Could not find any files belonging to user %s.%n", username);
+				try {
+					serverOut.writeBytes(String.format("Could not find any files belonging to user %s.%n", username));
+					serverOut.flush();
+				} catch (IOException ex) {
+					ex.printStackTrace();
+				}
 				return;
 			}
-
+			
+			int fileIndex = -1;
+			
 			for (int i = 0; i < userFileList.size() && fileInfo == null; i++) {
 				String s = userFileList.get(i);
 				int tick = s.indexOf('`');
 				if (tick != -1 && s.substring(0, tick).equals(filename)) {
 					fileInfo = s;
+					fileIndex = i;
 				}
 			}
 
 			if (fileInfo == null) {
-				serverOut.printf("Could not find a file with name \"%s\" belonging to user %s.%n", filename, username);
+				try {
+					serverOut.writeBytes(String.format("Could not find a file with name \"%s\" belonging to user %s.%n", filename, username));
+					serverOut.flush();
+				} catch (IOException ex) {
+					ex.printStackTrace();
+				}
 				return;
 			}
-
+			
+			// send response to client
+			try {
+				serverOut.writeBytes("removing file\n");
+				serverOut.flush();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
 			String[] tokens = fileInfo.split("`");
 			int serverId = Integer.parseInt(tokens[1]);
 			int backupServerId = Integer.parseInt(tokens[2]);
@@ -227,124 +291,168 @@ public class UAServer {
 
 			if (server1 != null) {
 				try {
-					var fsout = server1.getValue();
-					fsout.printf("remove~%s~%s%n", username, filename);
+					server1.lock();
+					server1.sendCommand(String.format("remove~%s~%s%n", username, filename));
 				} catch (Exception ex) {
 					ex.printStackTrace();
+				} finally {
+					server1.unlock();
 				}
 			} else {
-				log(String.format("Attempted to remove file \"%s\" from primary file server %d, " +
+				Logger.log("MAIN SERVER", String.format("Attempted to remove file \"%s\" from primary file server %d, " +
 						"but server's entry in file server list was null.", filename, serverId));
 			}
 
 			if (server2 != null) {
 				try {
-					var fsout = server2.getValue();
-					fsout.printf("remove~%s~%s%n", username, filename);
+					server2.lock();
+					server2.sendCommand(String.format("remove~%s~%s%n", username, filename));
 				} catch (Exception ex) {
 					ex.printStackTrace();
+				} finally {
+					server2.unlock();
 				}
 			} else {
-				log(String.format("Attempted to remove file [%s] from backup file server %d, " +
+				Logger.log("MAIN SERVER", String.format("Attempted to remove file [%s] from backup file server %d, " +
 						"but server's entry in file server list was null.", filename, backupServerId));
 			}
-		}
-
-		private void listUserFiles(String username, PrintWriter serverOut) {
-
-			// return list of files from userFiles HashMap instead of getting from file servers
 			
-			if (fileServers.size() == 0) {
-				log("Attempted \"list\" file operation with no available file servers.");
-				serverOut.println("No available file servers.");
-				return;
-			}
-
-			ArrayList<String> userFileList = getUserFilenames(username);
-
-			if (userFileList == null || userFileList.size() == 0) {
-				serverOut.printf("Could not find any files belonging to user %s.%n", username);
-				return;
-			}
-
-			for (String fileInfo : userFileList) {
-				String[] tokens = fileInfo.split("`");
-				int serverId = Integer.parseInt(tokens[1]);
-				var server = fileServers.get(serverId);
-				if (server != null) {
-					try {
-						var fsout = server.getValue();
-						fsout.printf("list~%s%n", username);
-					} catch (Exception ex) {
-						ex.printStackTrace();
-					}
-				} else {
-					log(String.format("Attempted to list files for user %s from file server %d, " +
-							"but server's entry in file server list was null.", username, serverId));
-				}
-			}
+			userFiles.get(username).remove(fileIndex);
+			
 		}
 
-		private void listAllFiles(String command, String parameter, Socket socket, PrintWriter serverOut) {
+		private void listUserFiles(String username, DataOutputStream serverOut) {
 
 			if (fileServers.size() == 0) {
-				log("Attempted '" + command + "' file operation with no available file servers.");
-				serverOut.println("No available file servers.");
-				return;
-			}
-
-			for (SimpleEntry<Socket, PrintWriter> entry : fileServers) {
-				PrintWriter p = entry.getValue();
+				Logger.log("MAIN SERVER", "Attempted \"list\" file operation with no available file servers.");
 				try {
-					p.format("%s~%s~%s%n", socket.toString(), command, parameter);
-				} catch (Exception ex) {
+					serverOut.writeBytes("No available file servers.\n");
+					serverOut.flush();
+				}  catch (IOException ex) {
 					ex.printStackTrace();
 				}
+				return;
+			}
+
+			var userFileList = getUserFilenames(username);
+
+			if (userFileList == null || userFileList.size() == 0) {
+				try {
+					serverOut.writeBytes(String.format("Could not find any files belonging to user %s.%n", username));
+					serverOut.flush();
+				}  catch (IOException ex) {
+					ex.printStackTrace();
+				}
+				return;
+			}
+			
+			// send response to client
+			
+			try {
+				Logger.log("MAIN SERVER", "Listing filenames for user " + username + "...");
+				serverOut.writeBytes("listing filenames\n");
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
+			for (String fileInfo : userFileList) {
+				String[] tokens = fileInfo.split("`");
+				String filename = tokens[0];
+
+				try {
+					serverOut.writeBytes(filename + "\n");
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+			
+			try {
+				serverOut.writeBytes("done\n");
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
+		}
+
+		private void listAllFiles(String command, String parameter, Socket socket, DataOutputStream serverOut) {
+
+			if (fileServers.size() == 0) {
+				Logger.log("MAIN SERVER", "Attempted '" + command + "' file operation with no available file servers.");
+				try {
+					serverOut.writeBytes("No available file servers.\n");
+					serverOut.flush();
+				} catch (IOException ex) {
+					ex.printStackTrace();
+				}
+				return;
+			}
+
+			for (var server : fileServers) {
+				try {
+					server.lock();
+					server.sendCommand(String.format("%s~%s~%s%n", socket.toString(), command, parameter));
+				} catch (Exception ex) {
+					ex.printStackTrace();
+				} finally {
+					server.unlock();
+				}
 			}
 		}
 
-		private void executeLoginCommand(String[] cmdArgs, PrintWriter serverOut) {
+		private void executeLoginCommand(String[] cmdArgs, DataOutputStream serverOut) {
 			// login syntax: login {username} {password}
+			
+			if (cmdArgs == null || cmdArgs.length < 2) {
+				return;
+			}
+			
 			String username = cmdArgs[1];
 			String password = cmdArgs[2];
 
 			if (username == null || !users.containsKey(username)) {
-				serverOut.println("Invalid username.");
+				try {
+					serverOut.writeBytes("Invalid username.\n");
+					serverOut.flush();
+				} catch (IOException ex) {
+					ex.printStackTrace();
+				}
 				return;
 			}
 
-			log(String.format("Logging in user '%s'...", username));
+			Logger.log("MAIN SERVER", String.format("Logging in user '%s'...", username));
 
 			if (!validateLogin(username, password)) {
-				serverOut.println("Login failed.");
-				log("Login failed.");
+				try {
+					serverOut.writeBytes("Login failed.\n");
+					serverOut.flush();
+				} catch (IOException ex) {
+					ex.printStackTrace();
+				}
+				Logger.log("MAIN SERVER", "Login failed.");
 				return;
 			}
 
 			currentUser = username;
-			serverOut.println("Login successful.");
-			log("Login successful.");
+			try {
+				serverOut.writeBytes("Login successful.\n");
+				serverOut.flush();
+			} catch (IOException ex) {
+				ex.printStackTrace();
+			}
+			Logger.log("MAIN SERVER", "Login successful.");
 		}
 
-		private void handleSocketException(SocketException ex, Socket socket, BufferedReader serverIn, PrintWriter serverOut) {
+		private void handleSocketException(SocketException ex, Socket socket, BufferedInputStream serverIn, DataOutputStream serverOut) {
 
             if (ex.getMessage().equalsIgnoreCase("connection reset")) {
-                try {
-					closeConnection(socket, serverIn, serverOut);
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-                synchronized(fileServers) {
-                	for(int i = 0; i < fileServers.size(); i++) {
-                    	if(fileServers.get(i).getKey() == socket) {
-                    		redistribute(socket);
-                    	}
-                    }
-                }
+				closeConnection(socket, serverIn, serverOut);
+				redistribute(socket);
+            } else {
+            	ex.printStackTrace();
             }
 		}
 
-		private void closeConnection(Socket socket, BufferedReader serverIn, PrintWriter serverOut) throws IOException {
+		private void closeConnection(Socket socket, BufferedInputStream serverIn, DataOutputStream serverOut) {
 
 			try {
                 if (serverOut != null)
@@ -362,48 +470,109 @@ public class UAServer {
 
 	private static void redistribute(Socket socket) {
 
-		int i = 0;
-        while (i < fileServers.size()) {
-            SimpleEntry<Socket, PrintWriter> entry = fileServers.get(i);
-            if (entry.getKey().equals(socket)) {
-                log("Found disconnected server.");
+		int index = 0;
+		Server failedServer = null;
+		
+        while (index < fileServers.size() && failedServer == null) {
+            if (fileServers.get(index).socket.equals(socket)) {
+                Logger.log("MAIN SERVER", "Found disconnected server.");
                 synchronized(fileServers) {
-                	 fileServers.remove(i);
+                	 failedServer = fileServers.remove(index);
                 }
             }
-            i++;
+            index++;
         }
-        for(int j = 0; j < fileServers.size(); j++) {
-        	fileServers.get(j).getValue().println("distribute");
+        
+        if (failedServer == null) {
+        	Logger.log("MAIN SERVER", "Failed to find disconnected server.");
+        	return;
         }
-
+        
+        var fileList = failedServer.list();
+        
+        if (fileList == null || fileList.size() == 0) {
+        	Logger.log("MAIN SERVER", "Disconnected server did not contain any files.");
+        	return;
+        }
+        
+        var backupLocations = new HashMap<String, SimpleEntry<String, Integer>>();
+        
+        for (String info : fileList) {
+        	String[] tokens = info.split("`");
+        	String filename = tokens[0];
+        	String username = tokens[1];
+        	int s1 = Integer.parseInt(tokens[2]);
+        	int s2 = Integer.parseInt(tokens[3]);
+        	if (s1 != failedServer.id) {
+        		backupLocations.put(filename, new SimpleEntry<>(username, s1));
+        	} else {
+        		backupLocations.put(filename, new SimpleEntry<>(username, s2));
+        	}
+        }
+        
+        var rng = new Random();
+        for (var entry : backupLocations.entrySet()) {
+        	
+        	String filename = entry.getKey();
+        	String username = entry.getValue().getKey();
+        	int serverIndex = entry.getValue().getValue();
+        	
+        	var server = serverMap.get(serverIndex);
+        	int originalLocation = -1;
+        	for (int i = 0; i < fileServers.size() && originalLocation == -1; i++) {
+        		var s = fileServers.get(i);
+        		if (s.id == server.id) {
+        			originalLocation = i;
+        		}
+        	}
+        	
+        	if (originalLocation == -1) {
+        		Logger.log("MAIN SERVER", "Failed to locate server with backup file copies for redistribution.");
+        		return;
+        	}
+        	
+        	int backupLocation;
+        	
+        	do {
+        		backupLocation = rng.nextInt(fileServers.size());
+        	} while (backupLocation == originalLocation);
+        	
+        	try {
+        		server.lock();
+        		server.sendCommand("backup\n");
+        		server.sendCommand(String.format("%s %s %d%n", filename, username, backupLocation));
+        	} catch (IOException ex) {
+        		Logger.log("MAIN SERVER", String.format("Exception raised while attempting to retrieve files from backup server after server failure.%nDetails:%n%s", ex.getMessage()));
+        	} finally {
+        		server.unlock();
+        	}
+        }
 	}
 
-	private static void log(String message) {
-
-		DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("MM/dd/yyyy hh:mm:ss.SS");
-		System.out.println(dateFormatter.format(LocalDateTime.now()) + " MAIN SERVER :  " + message);
-
-	}
 
 
-
-	private static void registerUser(String[] cmdArgs, PrintWriter serverOut) {
+	private static void registerUser(String[] cmdArgs, DataOutputStream serverOut) {
 
 		String username = cmdArgs[1];
 		String password = cmdArgs[2];
 
-		log(String.format("Registering new user '%s'...", username));
+		Logger.log("MAIN SERVER", String.format("Registering new user '%s'...", username));
 
 		try {
 			users.put(username, password);
 			userFiles.put(username, new ArrayList<String>());
-			serverOut.println("Register successful.");
-			log("Register successful.");
+			serverOut.writeBytes("Register successful.\n");
+			serverOut.flush();
+			Logger.log("MAIN SERVER", "Register successful.");
 		} catch(Exception e) {
 			e.printStackTrace();
-			serverOut.println("Register failed.");
-			log("Register failed.");
+			try {
+				serverOut.writeBytes("Register failed.\n");
+				serverOut.flush();
+			} catch (IOException ex) {
+				ex.printStackTrace();
+			}
+			Logger.log("MAIN SERVER", "Register failed.");
 		}
 
 	}
@@ -422,179 +591,94 @@ public class UAServer {
 		return userFiles.get(username);
 	}
 
-	private static byte[] receiveFile(Socket s){
+	private static void distributeFile(BufferedInputStream dataIn, String user, String filename, String size) throws Exception {
 
-		try {
-			int fourKBpage = 4096;
-			byte[] b = new byte[fourKBpage];
-
-			DataInputStream in = new DataInputStream(s.getInputStream());
+		Logger.log("MAIN SERVER", "============= Distributing file to file servers =============");
 			
-			int bytesRead = 0;
-			int offset = 0;
-			int fileSizeToReceive = 50000;
-
-			offset = fileSizeToReceive;
-
-			while( (bytesRead = in.read(b, 0, Math.min(fourKBpage, offset))) > 0){
+		int fileSize = Integer.parseInt(size);
+		Logger.log("MAIN SERVER", "Size of file about to receive: " + fileSize);
 				
-				// write bytes to file in memory
-
-				offset -= bytesRead;
-			}
-
-			return b;
-		} catch (Exception e) {
-			e.printStackTrace();
-			return null;
-		}
-
-	}
-
-	private static boolean distributeFile(Socket clientSocket, String user, String filename, String size){
-
-		log("============= Distributing file to file servers =============");
+		int[] servers = getServerIndices();
+		var server1 = fileServers.get(servers[0]);
+		var server2 = fileServers.get(servers[1]);
 		
-		try {
-			
-			//***************************************************************************************
-			// need to synchronize all of this such that a file server is only getting sent one 
-			// file's bytes at a time. don't want to mix two files' bytes together.
-			//***************************************************************************************
-			
-			int fileSize = Integer.parseInt(size);
-			int pageSize = 4096;
-			byte[] buffer = new byte[pageSize];
-			int bytesRead = 0;
-			int bytesLeft = fileSize;
-			log("Size of file about to receive: " + bytesLeft);
-
-			DataInputStream dataIn = new DataInputStream(clientSocket.getInputStream());
-			
-			// need to send file servers the same 'add username filename size' command before sending bytes
-			int[] servers = getServerIndices(filename);
-			DataOutputStream server1 = new DataOutputStream(fileServers.get(servers[0]).getKey().getOutputStream());
-			DataOutputStream server2 = new DataOutputStream(fileServers.get(servers[1]).getKey().getOutputStream());
-			PrintWriter server1text = new PrintWriter(fileServers.get(servers[0]).getKey().getOutputStream());
-			PrintWriter server2text = new PrintWriter(fileServers.get(servers[0]).getKey().getOutputStream());
-			
-//			server1text.printf("add %s %s %s\n", user, filename, size);
-//			server2text.printf("add %s %s %s\n", user, filename, size);
-			
-			// buffered output stream for saving file locally for testing
-			// directory needs to exist locally before this will work.
-			// need to write code for creating a directory if it doesn't exist.
-			
-			File filesDir = new File("files" + File.separator + user);
-			
-			if(!filesDir.exists()) {
-				filesDir.mkdirs();
-			}
-			
-			BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(filesDir + File.separator +filename));
-			
-			log("Sending bytes...");
-			
-			
-			while( (bytesRead = dataIn.read(buffer, 0, Math.min(pageSize, bytesLeft))) > 0){
-				log("Should have read " + Math.min(pageSize, bytesLeft) + " bytes.");
-				log("Read " + bytesRead + " bytes.");
-				
-				// write file to local disk for testing until we get file servers to accept file transfers
-				bos.write(buffer, 0, Math.min(pageSize, bytesLeft));
-				log("Wrote " + Math.min(pageSize, bytesLeft) + " to file.");
-				
-				//*********************************************************
-				// file servers explode when being sent unexpected things.
-				// their sockets also close when an exception is thrown.
-				// probably need to send them the 'add' command so they
-				// can start reading their input stream for files like this
-				// server does. get all bytes from input stream in their
-				// main thread, then start a new thread that writes those 
-				// bytes to disk.
-				//*********************************************************
-				// send file to file server DataOutputStreams
-//				server1.write(b);
-//				server2.write(b);
-				
-				bytesLeft -= bytesRead;
-				log(bytesLeft + " bytes left to read.");
-			}
-			
-			log("Successfully sent " + NumberFormat.getNumberInstance(Locale.US).format(fileSize) + " bytes to each file server.");
-			
-			fileCount++;
-			userFiles.get(user).add(filename + "`" + servers[0] + "`" + servers[1]);
-
-			//*************************************************************************
-			// don't think we can close this as it's the client thread's input stream.
-			// probably can't close the file server output streams either.
-			//*************************************************************************
-			//dataIn.close();
-			
-			// close output stream that writes to local disk.
-			// remove after file transfer to file servers is implemented.
-			bos.close();
-			
-			return true;
-			
-		} catch (Exception e) {
-			e.printStackTrace();
-			return false;
-		}
-
-
-
-	}
-
-	private static boolean sendFile(Socket s, UAFile file){
-		try{
-			DataOutputStream dos = new DataOutputStream(s.getOutputStream());
-
-			int fourKBpage = 4096;
-			byte[] b = new byte[fourKBpage];
-
-			BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file.getFile()));
-
-			while(  bis.read(b) > 0){
-				dos.write(b);
-			}
-
-			dos.close();
-			bis.close();
-
-			return true;
-		}
-		catch(Exception e){
-			e.printStackTrace();
-			return false;
-		}
-
-	}
-
-    private static int[] getServerIndices(String filename) {
+//		File filesDir = new File("files" + File.separator + user);
 		
-    	// assuming all even file servers on one machine and all odd # on other machine
-    	// server 1 = file count % number servers
-    	// server 2 = server 1 + 1    	
+//		if(!filesDir.exists()) {
+//			filesDir.mkdirs();
+//		}
+		
+		String fileInfo = String.format("%s`%s`%d`%d", filename, user, server1.id, server2.id);
+		
+		ArrayList<Byte> data = readAllBytes(dataIn, fileSize);
+		
+		Logger.log("MAIN SERVER", "Sending bytes...");
+		
+		server1.lock();
+		server1.sendCommand("add\n");
+		server1.sendCommand(String.format("%s %s %s\n", user, filename, size));
+		server1.sendBytes(data);
+		server1.add(fileInfo);
+		server1.unlock();
+		
+		server2.lock();
+		server2.sendCommand("add\n");
+		server2.sendCommand(String.format("%s %s %s\n", user, filename, size));
+		server2.sendBytes(data);
+		server2.add(fileInfo);
+		server2.unlock();
+		
+		Logger.log("MAIN SERVER", "Successfully sent " + NumberFormat.getNumberInstance(Locale.US).format(fileSize) + " bytes to each file server.");
+		fileCount++;
+		userFiles.get(user).add(filename + "`" + servers[0] + "`" + servers[1]);
+	}
+	
+	private static ArrayList<Byte> readAllBytes(BufferedInputStream in, int fileSize) throws IOException {
+		ArrayList<Byte> data = new ArrayList<>();
+		int pageSize = 4096;
+		byte[] buffer = new byte[pageSize];
+		int bytesRead = 0;
+		int bytesLeft = fileSize;
+		while((bytesRead = in.read(buffer, 0, Math.min(pageSize, bytesLeft))) > 0) {
+			for (int i = 0; i < bytesRead; i++) {
+				data.add(buffer[i]);
+			}
+			bytesLeft -= bytesRead;
+		}
+		return data;
+	}
+
+	/**
+	 * Gets the index of the servers on which to store an original and backup copy of a file.
+	 * The method assumes that servers are started in alternating fashion, which will lead
+	 * to files being evenly distributed across all virtual servers on all machines.
+	 * @return An array containing the indices of the primary and backup file-storage servers.
+	 */
+    private static int[] getServerIndices() {
     	
-		var reversedFilename = new StringBuilder();
+    	int server1 = fileCount % fileServers.size();
+    	int server2 = server1 + 1;
+    	
+    	if (server2 >= fileServers.size()) {
+    		server2 = 0;
+    	}
 		
-		for (int i = filename.length() - 1; i >= 0; i--) {
-            reversedFilename.append(filename.charAt(i));
-        }
-		
-		int i1 = Math.abs(filename.hashCode() % fileServers.size());
-        int i2 = Math.abs(reversedFilename.toString().hashCode() % fileServers.size());
-		
-		if (i1 == i2) {
-            i2++;
-            if (i2 >= fileServers.size()) {
-                i2 = 0;
-            }
-        }
-		
-		return new int[] {i1, i2};
+		return new int[] {server1, server2};
+    }
+    
+    /**
+     * Generates two random numbers representing the servers on which to store the original
+     * and backup copies of a file.
+     * @return An array containing the indices of the primary and backup file-storage servers.
+     */
+    private static int[] getRandomServerIndices() {
+    	var rng = new java.util.Random();
+    	int server1 = rng.nextInt(fileServers.size());
+    	int server2;
+    	do {
+    		server2 = rng.nextInt(fileServers.size());
+    	} while (server2 == server1);
+    	return new int[] {server1, server2};
     }
 
 	private static class DispatcherService extends Thread {
@@ -612,16 +696,21 @@ public class UAServer {
                             fileCount--;
                         }
 						String content = message.substring(2);
-						log("Dispatcher Service: " + content);
+						Logger.log("MAIN SERVER", "Dispatcher Service: " + content);
 						String[] tokens = content.split("~");
 						String socketString = tokens[0];
 						String transmission = tokens[1];
-						PrintWriter clientOut = clients.get(socketString);
+						var clientOut = clients.get(socketString);
 						if (clientOut != null) {
-							clientOut.println(transmission);
+							try {
+								clientOut.writeBytes(String.format("%s%n", transmission));
+								clientOut.flush();
+							} catch (IOException ex) {
+								ex.printStackTrace();
+							}
 						}
 					} else {
-						log(message);
+						Logger.log("MAIN SERVER", message);
 					}
 				}
 
@@ -635,44 +724,83 @@ public class UAServer {
 
     }
 
-    private static class FileDistributor extends Thread {
-        private HashMap<Integer, String> serverResponses = new HashMap<>();
-
-        @Override
-        public void run() {
-            while (true) {
-                if (serverResponses.size() == fileServers.size()) {
-                    HashMap<String, String> files = new HashMap<>();
-                    for (String entry : serverResponses.values()) {
-                        String[] filenames = entry.split("[|]");
-                        for (String name : filenames) {
-                            System.out.println(name);
-                        }
-                        for (String name : filenames) {
-                            if (!files.containsKey(name)) {
-                                files.put(name, name);
-                            }
-                        }
-                    }
-                    for (String file : files.values()) {
-                        int[] indices = getServerIndices(file);
-                        var dest1 = fileServers.get(indices[0]);
-                        var dest2 = fileServers.get(indices[1]);
-                        dest1.getValue().printf("distributor~add~%s%n", file);
-                        dest2.getValue().printf("distributor~add~%s%n", file);
-                    }
-                    serverResponses.clear();
-                } else {
-                    try {
-                        sleep(500);
-                    } catch (InterruptedException ex) {
-                        ex.printStackTrace();
-                    }
-                }
-            }
-
-        }
+    private static class Server {
+    	
+    	int id;
+    	Socket socket;
+    	BufferedInputStream in;
+    	DataOutputStream out;
+    	HashMap<String, String> files = new HashMap<>();
+    	final ReentrantLock SERVER_LOCK = new ReentrantLock();
+    	
+    	Server(Socket socket, BufferedInputStream in, DataOutputStream out) {
+    		this.socket = socket;
+    		this.in = in;
+    		this.out = out;
+    		id = socket.getPort();
+    	}
+    	
+    	void add(String filename) {
+    		synchronized(files) {
+    			files.put(filename, filename);
+    		}
+    	}
+    	
+    	void remove(String filename) {
+    		synchronized(files) {
+    			files.remove(filename);
+    		}
+    	}
+    	
+    	ArrayList<String> list() {
+    		return new ArrayList<>(files.values());
+    	}
+    	
+    	void shutdown() throws IOException {
+			socket.close();
+    	}
+    	
+    	void sendCommand(String command) throws IOException {
+    		
+    		if (command != null && command.length() > 0) {
+    			if (command.charAt(command.length() - 1) != '\n') {
+    				command += '\n';
+    			}
+	    		synchronized(out) {
+	    			out.writeBytes(command);
+	    			out.flush();
+	    		}
+    		}
+    	}
+    	
+    	void sendBytes(byte[] b, int off, int len) throws IOException {
+    		synchronized(out) {
+    			out.write(b, off, len);
+    			out.flush();
+    		}
+    	}
+    	
+    	void sendBytes(ArrayList<Byte> data) throws IOException {
+    		int pageSize = 4096;
+    		byte[] buffer = new byte[pageSize];
+    		int len = Math.min(pageSize, data.size());
+    		for (int position = 0, index = 0; position < data.size(); position++) {
+    			buffer[index] = data.get(position);
+    			index++;
+    			if (index >= len) {
+    				index = 0;
+    				sendBytes(buffer, 0, len);
+    				len = Math.min(pageSize, data.size() - position - 1);
+    			}
+    		}
+    	}
+    	
+    	void lock() {
+    		SERVER_LOCK.lock();
+    	}
+    	
+    	void unlock() {
+    		SERVER_LOCK.unlock();
+    	}
     }
-
-
 }
