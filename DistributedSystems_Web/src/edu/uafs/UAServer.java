@@ -12,6 +12,7 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
@@ -177,8 +178,16 @@ public class UAServer {
 						Logger.log("MAIN SERVER", "Add command received. Distributing file to servers...");
 						// add syntax: add {filename} {file size in bytes}
 						try {
-							distributeFile(serverIn, this.currentUser, parameter, cmdArgs[2]);
-							Logger.log("MAIN SERVER", "Add command successfully executed!");
+							if(fileServers.size() == 0) {
+								serverOut.writeBytes("no available file servers.\n");
+								serverOut.flush();
+								break;
+							} else {
+								serverOut.writeBytes("accepted.\n");
+								serverOut.flush();
+								distributeFile(serverIn, this.currentUser, parameter, cmdArgs[2]);
+								Logger.log("MAIN SERVER", "Add command successfully executed!");
+							}
 						} catch (Exception ex) {
 							Logger.log("MAIN SERVER", "Exception thrown while distributing file.");
 						}
@@ -244,12 +253,15 @@ public class UAServer {
 				}
 				return;
 			}
-
+			
+			int fileIndex = -1;
+			
 			for (int i = 0; i < userFileList.size() && fileInfo == null; i++) {
 				String s = userFileList.get(i);
 				int tick = s.indexOf('`');
 				if (tick != -1 && s.substring(0, tick).equals(filename)) {
 					fileInfo = s;
+					fileIndex = i;
 				}
 			}
 
@@ -262,7 +274,15 @@ public class UAServer {
 				}
 				return;
 			}
-
+			
+			// send response to client
+			try {
+				serverOut.writeBytes("removing file\n");
+				serverOut.flush();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
 			String[] tokens = fileInfo.split("`");
 			int serverId = Integer.parseInt(tokens[1]);
 			int backupServerId = Integer.parseInt(tokens[2]);
@@ -296,12 +316,13 @@ public class UAServer {
 				Logger.log("MAIN SERVER", String.format("Attempted to remove file [%s] from backup file server %d, " +
 						"but server's entry in file server list was null.", filename, backupServerId));
 			}
+			
+			userFiles.get(username).remove(fileIndex);
+			
 		}
 
 		private void listUserFiles(String username, DataOutputStream serverOut) {
 
-			// return list of files from userFiles HashMap instead of getting from file servers
-			
 			if (fileServers.size() == 0) {
 				Logger.log("MAIN SERVER", "Attempted \"list\" file operation with no available file servers.");
 				try {
@@ -324,25 +345,33 @@ public class UAServer {
 				}
 				return;
 			}
-
+			
+			// send response to client
+			
+			try {
+				Logger.log("MAIN SERVER", "Listing filenames for user " + username + "...");
+				serverOut.writeBytes("listing filenames\n");
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
 			for (String fileInfo : userFileList) {
 				String[] tokens = fileInfo.split("`");
-				int serverId = Integer.parseInt(tokens[1]);
-				var server = fileServers.get(serverId);
-				if (server != null) {
-					try {
-						server.lock();
-						server.sendCommand(String.format("list %s%n", username));
-					} catch (Exception ex) {
-						ex.printStackTrace();
-					} finally {
-						server.unlock();
-					}
-				} else {
-					Logger.log("MAIN SERVER", String.format("Attempted to list files for user %s from file server %d, " +
-							"but server's entry in file server list was null.", username, serverId));
+				String filename = tokens[0];
+
+				try {
+					serverOut.writeBytes(filename + "\n");
+				} catch (IOException e) {
+					e.printStackTrace();
 				}
 			}
+			
+			try {
+				serverOut.writeBytes("done\n");
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
 		}
 
 		private void listAllFiles(String command, String parameter, Socket socket, DataOutputStream serverOut) {
@@ -568,16 +597,16 @@ public class UAServer {
 			
 		int fileSize = Integer.parseInt(size);
 		Logger.log("MAIN SERVER", "Size of file about to receive: " + fileSize);
-		
+				
 		int[] servers = getServerIndices();
 		var server1 = fileServers.get(servers[0]);
 		var server2 = fileServers.get(servers[1]);
 		
-		File filesDir = new File("files" + File.separator + user);
+//		File filesDir = new File("files" + File.separator + user);
 		
-		if(!filesDir.exists()) {
-			filesDir.mkdirs();
-		}
+//		if(!filesDir.exists()) {
+//			filesDir.mkdirs();
+//		}
 		
 		String fileInfo = String.format("%s`%s`%d`%d", filename, user, server1.id, server2.id);
 		

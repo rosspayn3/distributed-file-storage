@@ -27,10 +27,10 @@ public class FileServer {
 	public static void main(String[] args) throws IOException {
 		
 		// get starting directory from command arguments
-		// final String path = args[0];
+		 final String path = args[0];
 		
 		// hard-coded starting directory for now
-		final String path = "files";
+//		final String path = "files";
 		fileDirectory = new File(path);
 		
 		try {
@@ -114,9 +114,16 @@ public class FileServer {
 		String user = tokens[0];
 		String filename = tokens[1];
 		String path = String.format("%s%s%s%s%s",
-				fileDirectory.getAbsolutePath(), File.separator, user, File.separator, filename); 
+				fileDirectory, File.separator, user, File.separator, filename); 
 		int fileSize = Integer.parseInt(tokens[2]);
 		int bytesLeft = fileSize;
+		
+		// create user's directory inside starting directory if it doesn't exist
+		File userdir = new File(fileDirectory + File.separator + user);
+		
+		if(!userdir.exists()) {
+			userdir.mkdirs();
+		}
 		
 		UAFile uaFile = new UAFile(filename, path, user, fileSize);
 		
@@ -124,10 +131,7 @@ public class FileServer {
 			return;
 		}
 		
-		File file = new File(path);
-		
-		// creates file if it doesn't exist or erases contents if it does
-		new PrintWriter(file).close();
+		File file = new File(userdir + File.separator + filename);
 		
 		var bos = new BufferedOutputStream(new FileOutputStream(file, true));
 		
