@@ -29,17 +29,14 @@ public class LoginServlet extends HttpServlet {
         // TODO Auto-generated constructor stub
     }
 
-	/**
-	 * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
-	 */
-	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-
-		
-		
-	}
 
 	/**
 	 * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse response)
+	 * <p>
+	 * Accepts a username and password from {@code login.jsp} or {@code index.jsp}. The credentials are then
+	 * validated in {@link UAServer} using the browser session's {@link WebClient} socket connection.
+	 * <p>
+	 * This method assigns a success/error message before forwarding the request.
 	 */
 	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 

@@ -17,29 +17,36 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import javax.servlet.jsp.JspWriter;
 
+/**
+ * A client class to be used in {@code .jsp} pages for communication with an instance of {@link UAServer}.
+ * <p> 
+ * An instance of this object will be maintained in a web browser session and passed to servlets to facilitate 
+ * communication.
+ *
+ */
 public class WebClient {
 	
-	Socket socket;
-	PrintWriter clientOut;
-	BufferedReader clientIn;
-	ArrayList<String> filenames;
-	String username;
+	private Socket socket;
+	private PrintWriter clientOut;
+	private BufferedReader clientIn;
+	private ArrayList<String> filenames;
+	private String username;
 	
-	
+	/**
+	 * Default constructor for {@link WebClient}. {@link WebClient#connect(JspWriter)} is called 
+	 * inside the constructor to initialize a {@link Socket} connection with an instance of {@link UAServer}.
+	 * <p>
+	 * This method prints a success/error message to the {@code .jsp} page that called this method. 
+	 * 
+	 * @param session	The current browser {@link HttpSession} object.
+	 * @param out	The {@link JspWriter} of the {@code .jsp} page that called this method.
+	 */
 	public WebClient(HttpSession session, JspWriter out) {
 		
 		try {
-			// this attempts to connect to the wrong port to simulate connection failure.
-			// code in .jsp pages should call the connect() method with the correct port on page refresh.
 			
-//			this.socket = new Socket("127.0.0.1", 54320);
-//			this.clientOut = new PrintWriter(socket.getOutputStream(), true);
-//			this.clientIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-//			clientOut.println("client connected");
-//			getServerResponse();
-			
-			// use this method once testing is complete
 			connect(out);
+			
 		} catch(Exception e) {
 			try {
 				out.print("<h1 class=\"text-danger text-center mt-3\"><strong>Exception</strong></h1>"
@@ -52,6 +59,16 @@ public class WebClient {
 		
 	}
 	
+	/**
+	 * Initializes a new {@link Socket} connection with an instance of {@link UAServer}.
+	 * <p>
+	 * This method prints a success/error message to the {@code .jsp} page that called this method. 
+	 * 
+	 * @param out	The {@link JspWriter} of the {@code .jsp} page that called either 
+	 * 				{@link WebClient#WebClient(HttpSession, JspWriter)}	or this method.
+	 * 
+	 * @return	A boolean value representing the success of the attempted {@link Socket} connection.
+	 */
 	public boolean connect(JspWriter out) {
 		
 		try {
@@ -77,38 +94,17 @@ public class WebClient {
 		
 	}
 
-	public Socket getSocket() {
-		return socket;
-	}
-
-	public void setSocket(Socket socket) {
-		this.socket = socket;
-	}
-
-	public PrintWriter getPrintWriter() {
-		return clientOut;
-	}
-
-	public void setPrintWriter(PrintWriter writer) {
-		this.clientOut = writer;
-	}
-	
-	public String getUsername() {
-		return username;
-	}
-	
-	public void setUsername(String username) {
-		this.username = username;
-	}
-	
-	public void setFileNames(ArrayList<String> filenames) {
-		this.filenames = filenames;
-	}
-	
-	public ArrayList<String> getFileNames(){
-		return this.filenames;
-	}
-	
+	/**
+	 * Sends a register command to an instance of {@link UAServer} via the {@link Socket} stored in this object.
+	 * <p>
+	 * This method assigns a success/error message to the {@link HttpServletRequest}.
+	 * 
+	 * @param username	The username
+	 * @param password	The password
+	 * @param request	The {@link HttpServletRequest} from the servlet calling this method.
+	 * 
+	 * @return	A boolean value representing the success of the operation.
+	 */
 	public boolean register(String username, String password, HttpServletRequest request) {
 		
 		boolean success = false;
@@ -126,7 +122,7 @@ public class WebClient {
 				success = false;
 			}
 		} catch (Exception e) {
-			System.err.println("WEBCLIENT: Exception in WebClient register method.");
+			System.out.println("WEBCLIENT: Exception in WebClient register method.");
 			e.printStackTrace();
 			return false;
 		}
@@ -134,6 +130,16 @@ public class WebClient {
 		return success;
 	}
 	
+	/**
+	 * Sends a login command to an instance of {@link UAServer} for validation via the {@link Socket} 
+	 * stored in this object. If the {@link UAServer} responds with a success message, the given username 
+	 * is stored in the current instance of {@link WebClient}.
+	 * 
+	 * @param username	The username.
+	 * @param password	The password.
+	 * 
+	 * @return	A boolean value representing the success of the login operation.
+	 */
 	public boolean login(String username, String password) {
 		try {
 			clientOut.println(String.format("login %s %s", username, password));
@@ -144,12 +150,19 @@ public class WebClient {
 				return false;
 			}
 		} catch (Exception e) {
-			System.err.println("!! WEBCLIENT: Exception in WebClient login method.\n");
+			System.out.println("!! WEBCLIENT: Exception in WebClient login method.\n");
 			e.printStackTrace();
 			return false;
 		}
 	}
 	
+	/**
+	 * Sends a message to an instance of {@link UAServer} via the {@link Socket} stored in this object.
+	 * 
+	 * @param msg The message to be sent.
+	 * 
+	 * @return	A boolean value representing the success of the send operation.
+	 */
 	public boolean sendMessage(String msg) {
 		
 		try {
@@ -157,25 +170,43 @@ public class WebClient {
 			System.out.println("WEBCLIENT: Sent '" + msg + "' to server.");
 			return true;
 		} catch (Exception e) {
-			System.err.println("!! WEBCLIENT: Exception in WebClient sendMessage method.\n");
+			System.out.println("!! WEBCLIENT: Exception in WebClient sendMessage method.\n");
 			e.printStackTrace();
 			return false;
 		}
 		
 	}
 	
+	/**
+	 * Reads one line from the {@link InputStream} of the {@link Socket} stored in this object.
+	 *  
+	 * @return	The line that was read.
+	 */
 	public String getServerResponse() {
 		try {
 			String response = clientIn.readLine();
 			System.out.println("WEBCLIENT: Response from server: " + response);
 			return response;
 		} catch (Exception e) {
-			System.err.println("!! WEBCLIENT: Exception in WebClient getServerResponse method.\n");
+			System.out.println("!! WEBCLIENT: Exception in WebClient getServerResponse method.\n");
 			e.printStackTrace();
 			return null;
 		}
 	}
 	
+	/**
+	 * Sends an add file command to an instance of {@link UAServer} via the {@link Socket} stored in this object. 
+	 * This method should be called before transferring bytes of a file over the {@link Socket} to tell the 
+	 * {@link UAServer} how many bytes should be read for the file.
+	 * <p>
+	 * One or more {@link FileServer} data nodes must be connected to the {@link UAServer} for the command 
+	 * to be accepted.
+	 * 
+	 * @param filename	The name of the file to be sent.
+	 * @param size	The size of the file, in bytes.
+	 * 
+	 * @return	A boolean value representing whether the {@link UAServer} has accepted the request for file transfer.
+	 */
 	public boolean sendAddFileCommand(String filename, long size) {
 		
 		boolean success = false;
@@ -191,13 +222,24 @@ public class WebClient {
 			}
 			
 		} catch (Exception e) {
-			System.err.println("!! WEBCLIENT: Exception in WebClient sendAddFileCommand method.\n");
+			System.out.println("!! WEBCLIENT: Exception in WebClient sendAddFileCommand method.\n");
 		}
 		
 		return success;
 		
 	}
 	
+	/**
+	 * Sends a remove file command to an instance of {@link UAServer} via the {@link Socket} stored in this object.
+	 * <p>
+	 * One or more {@link FileServer} data nodes must be connected to the {@link UAServer} for the command 
+	 * to be accepted.
+	 * 
+	 * @param filename	The name of the file to be removed.
+	 * 
+	 * @return	A boolean value representing whether the {@link UAServer} has accepted the request, AND found the file 
+	 * 			to be removed.
+	 */
 	public boolean sendRemoveFileCommand(String filename) {
 		
 		boolean success = false;
@@ -213,13 +255,21 @@ public class WebClient {
 			}
 			
 		} catch (Exception e) {
-			System.err.println("!! WEBCLIENT: Exception in WebClient sendRemoveFileCommand method.\n");
+			System.out.println("!! WEBCLIENT: Exception in WebClient sendRemoveFileCommand method.\n");
 		}
 		
 		return success;
 		
 	}
 	
+	/**
+	 * Sends a request to list files for the current user stored in the instance of {@link WebClient} to an instance of 
+	 * {@link UAServer} via the {@link Socket} stored in this object.
+	 * 
+	 * @param username The user files should be listed for.
+	 * @return	An {@link ArrayList} of file names that belong to the user. The list will contain one element with a value 
+	 * 			of "No files." if no files were found, or an error message.
+	 */
 	public ArrayList<String> listUserFiles(String username) {
 		
 		filenames.clear();
@@ -241,44 +291,82 @@ public class WebClient {
 				filenames.add("Something went wrong.");
 			}
 		} catch (Exception e) {
-			System.err.println("!! WEBCLIENT: Exception in WebClient listUserFiles method.\n");
+			System.out.println("!! WEBCLIENT: Exception in WebClient listUserFiles method.\n");
 			e.printStackTrace();
 		}
 		
 		return filenames;
 	}
 	
-	public boolean sendFile(String file) {
-		
-		try {
-			
-			// send 'add' command (or just start writing bytes to output stream)
-			
-			// maybe wait for 'ready' message from file server before transferring?
-			
-			// wait for success message after transfer is complete
-			
-			// return true/false
-			
-			
-			
-			// this works with the String storage system we have now
-			clientOut.println("add " + file);
-			String response = getServerResponse();
-			// consume extra success message from second file server 
-			getServerResponse();
-			if(response.contains("success")) {
-				return true;
-			} else {
-				return false;
-			}
-			
-		} catch (Exception e) {
-			// something bad happened
-			
-			e.printStackTrace();
-			return false;
-		}
+
+	/**
+	 * @return the socket
+	 */
+	public Socket getSocket() {
+		return socket;
+	}
+
+	/**
+	 * @param socket the socket to set
+	 */
+	public void setSocket(Socket socket) {
+		this.socket = socket;
+	}
+
+	/**
+	 * @return the clientOut
+	 */
+	public PrintWriter getClientOut() {
+		return clientOut;
+	}
+
+	/**
+	 * @param clientOut the clientOut to set
+	 */
+	public void setClientOut(PrintWriter clientOut) {
+		this.clientOut = clientOut;
+	}
+
+	/**
+	 * @return the clientIn
+	 */
+	public BufferedReader getClientIn() {
+		return clientIn;
+	}
+
+	/**
+	 * @param clientIn the clientIn to set
+	 */
+	public void setClientIn(BufferedReader clientIn) {
+		this.clientIn = clientIn;
+	}
+
+	/**
+	 * @return the filenames
+	 */
+	public ArrayList<String> getFilenames() {
+		return filenames;
+	}
+
+	/**
+	 * @param filenames the filenames to set
+	 */
+	public void setFilenames(ArrayList<String> filenames) {
+		this.filenames = filenames;
+	}
+
+	/**
+	 * @return the username
+	 */
+	public String getUsername() {
+		return username;
+	}
+
+	/**
+	 * @param username the username to set
+	 */
+	public void setUsername(String username) {
+		this.username = username;
 	}
 	
 }

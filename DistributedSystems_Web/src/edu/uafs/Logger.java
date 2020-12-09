@@ -14,6 +14,7 @@ public class Logger {
 	
 	/**
 	 * Prints sender and message to the console.
+	 * 
 	 * @param sender The source of the message.
 	 * @param message The message to print.
 	 */
@@ -24,6 +25,7 @@ public class Logger {
 	
 	/**
 	 * Saves the sender and message to the "DistSys_Log" file in the Logger's specified directory.
+	 * 
 	 * @param sender The source of the message.
 	 * @param message The message to save.
 	 */
@@ -42,6 +44,7 @@ public class Logger {
 	
 	/**
 	 * Prints the sender and message to the console and saves them to a file at the same time.
+	 * 
 	 * @param sender The source of the message.
 	 * @param message The message to print and save.
 	 */

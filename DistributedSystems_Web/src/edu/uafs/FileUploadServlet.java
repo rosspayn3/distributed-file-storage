@@ -1,19 +1,13 @@
 package edu.uafs;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintWriter;
-import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Collection;
+import java.text.NumberFormat;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Locale;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.MultipartConfig;
@@ -35,6 +29,10 @@ public class FileUploadServlet extends HttpServlet {
 	
 	/**
 	 * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse response)
+	 * <p>
+	 * Reads one {@link Part} from a multipart form on {@code files.jsp} and sends that {@link Part}'s bytes
+	 * over a {@link WebClient}'s {@link DataOutputStream} to an instance of {@link UAServer}. A success/error
+	 * message is assigned before forwarding the request.
 	 */
 	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 
@@ -66,8 +64,16 @@ public class FileUploadServlet extends HttpServlet {
 	
 	
 	
-	/*
-	 *  Sends a file to the UAServer
+	/**
+	 * Reads one {@link Part} from a multipart form on {@code files.jsp} and sends that {@link Part}'s bytes
+	 * over a {@link WebClient}'s {@link DataOutputStream} to an instance of {@link UAServer}.
+	 * <p>
+	 * This method sets the success/error message for the {@link HttpServletRequest} before returning.
+	 * 
+	 * @param request The {@link HttpServletRequest} object from {@link FileUploadServlet#doPost(HttpServletRequest, HttpServletResponse)}.
+	 * @param response The {@link HttpServletResponse} object from {@link FileUploadServlet#doPost(HttpServletRequest, HttpServletResponse)}.
+	 * @param client	The {@link WebClient} stored in the web browser's session.
+	 * @return	A boolean value representing the success of a {@link Part}'s transfer to {@link UAServer}.
 	 */
 	private boolean upload(HttpServletRequest request, HttpServletResponse response, WebClient client) {
 		
@@ -84,7 +90,6 @@ public class FileUploadServlet extends HttpServlet {
 				// get file name, replace spaces with '-', add .tmp extension in case we need it
 				String filename = getFileName(part).replace(" ", "-") + ".temp";
 				
-				// send 'add' command to server with filename and size
 				//                                              v----  remove .tmp extension  ----v
 				boolean proceed = client.sendAddFileCommand(filename.substring(0, filename.length()-5), part.getSize());
 				
@@ -105,21 +110,14 @@ public class FileUploadServlet extends HttpServlet {
 					DataOutputStream dataOut = new DataOutputStream(client.getSocket().getOutputStream());
 					BufferedInputStream fileIn = new BufferedInputStream(part.getInputStream());
 					
-					// buffered output stream for saving file locally for testing
-					// String username = (String) request.getSession().getAttribute("username");
-					// BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream("C:\\upload\\received\\"+"\\"+username+"\\"+filename.substring(0,filename.length()-5)));
+					Instant start = Instant.now();
 					
-					while( (bytesRead = fileIn.read(buffer, 0, Math.min(pageSize, bytesLeft))) > 0 ) {
-						
-						// write file locally for testing
-						// bos.write(buffer, 0 , bytesRead);
-						
-						// send file over socket
+					while( (bytesRead = fileIn.read(buffer, 0, Math.min(pageSize, bytesLeft))) > 0 ) {					
 						dataOut.write(buffer, 0, Math.min(pageSize, bytesLeft));
-						
 						bytesLeft -= bytesRead;
 					}
 					
+					Instant end = Instant.now();
 					
 					// ******************************************************************************
 					// this method says it reads all bytes from an input stream and transfers them to 
@@ -127,14 +125,21 @@ public class FileUploadServlet extends HttpServlet {
 					// ******************************************************************************
 //					fileIn.transferTo(dataOut);
 					
-					System.out.println("FILEUPLOADSERVLET: Done sending file to UAServer.");
+					Duration timeBetween = Duration.between(start, end);
 					
+					
+					Logger.log("FILEUPLOADSERVLET", String.format("File '%s' of size %d KB sent to UAServer after %sm %ss %sms.",
+														filename, NumberFormat.getNumberInstance(Locale.US).format( ((double) fileSize / 1000.0) ),
+														timeBetween.toMinutesPart(), timeBetween.toSecondsPart(),
+														timeBetween.toMillisPart()
+					));
 
 					fileIn.close();
 
 					return true;
 				}
 				catch(Exception e){
+					Logger.log("FILEUPLOADSERVLET", "Exception when sending file to UAServer.");
 					e.printStackTrace();
 					return false;
 				}
@@ -149,10 +154,16 @@ public class FileUploadServlet extends HttpServlet {
 		
 	}
 	
+	/**
+	 * Returns the given file name for a {@link Part}.
+	 * 
+	 * @param part	The {@link Part} to get the file name from.
+	 * @return	The file name for the given {@link Part}.
+	 */
 	private String getFileName(Part part) {
 		
 		// use this for built-in browser in Eclipse
-		//Collection<String> headers = part.getHeaders("content-disposition");
+		// Collection<String> headers = part.getHeaders("content-disposition");
 	    // return headers.toString().substring(headers.toString().lastIndexOf('\\') + 1, headers.toString().length()-2);
 		
 		// use this for chrome (chromium-based) browsers

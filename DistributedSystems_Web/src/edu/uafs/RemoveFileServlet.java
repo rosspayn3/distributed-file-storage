@@ -17,6 +17,10 @@ public class RemoveFileServlet extends HttpServlet {
 
 	/**
 	 * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse response)
+	 * <p>
+	 * Sends a {@code remove [user] [filename]} command to an instance of {@link UAServer} via a {@link WebClient} {@link Socket} 
+	 * connection. The 'user' and 'filename' parameters are retrieved from the {@link WebClient} and {@link HttpServletRequest}, 
+	 * respectively.
 	 */
 	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 
