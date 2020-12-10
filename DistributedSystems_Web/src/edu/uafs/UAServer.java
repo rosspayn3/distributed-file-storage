@@ -7,23 +7,17 @@
 package edu.uafs;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
-import java.text.NumberFormat;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.Locale;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -45,7 +39,7 @@ public class UAServer {
 	private static ArrayList<Server> fileServers = new ArrayList<>();
 	
 	/**
-	 * 
+	 * A HashMap that pairs server IDs with {@link Server} objects.
 	 * 
 	 */
 	private static HashMap<Integer, Server> serverMap = new HashMap<>();
@@ -56,7 +50,7 @@ public class UAServer {
 	private static HashMap<String, DataOutputStream> clients = new HashMap<>();
 	
 	/**
-	 * 
+	 * Used by the dispatcher service to send messages to clients.
 	 * 
 	 */
 	private static LinkedList<String> messageQueue = new LinkedList<>();
@@ -190,10 +184,12 @@ public class UAServer {
 		}
 		
 		/**
-		 * 
-		 * 
-		 * 
-		 */
+         * Called when a server gets disconnected. Sends a backup copy of a file to another server.
+         * 
+         * @param r The BufferedReader used to read the destination server for the backup file.
+         * @param in BufferedInputStream from which to receive the file from the origin server.
+         * @throws Exception
+         */
 		private void backupFile(BufferedReader r, BufferedInputStream in) throws Exception {
 			int destination = Integer.parseInt(r.readLine());
 			int fileSize = Integer.parseInt(r.readLine());
@@ -377,7 +373,9 @@ public class UAServer {
 			if (server1 != null) {
 				try {
 					server1.lock();
-					server1.sendCommand(String.format("remove~%s~%s%n", username, filename));
+					server1.sendCommand("remove");
+					Thread.sleep(200);
+					server1.sendCommand(String.format("%s:%s\n", username, filename));
 				} catch (Exception ex) {
 					ex.printStackTrace();
 				} finally {
@@ -391,7 +389,9 @@ public class UAServer {
 			if (server2 != null) {
 				try {
 					server2.lock();
-					server2.sendCommand(String.format("remove~%s~%s%n", username, filename));
+					server2.sendCommand("remove");
+					Thread.sleep(200);
+					server2.sendCommand(String.format("%s:%s\n", username, filename));
 				} catch (Exception ex) {
 					ex.printStackTrace();
 				} finally {
@@ -598,10 +598,11 @@ public class UAServer {
 	}
 
 	/**
-	 * 
-	 * 
-	 * 
-	 */
+     * Removes a failed server from server list and server map
+     * and redistributes the files it contained to other servers.
+     * 
+     * @param socket The socket belonging to the disconnected server.
+     */
 	private static void redistribute(Socket socket) {
 
 		int index = 0;
@@ -674,10 +675,13 @@ public class UAServer {
         	try {
         		server.lock();
         		server.sendCommand("backup\n");
+        		Thread.sleep(200);
         		server.sendCommand(String.format("%s %s %d%n", filename, username, backupLocation));
         	} catch (IOException ex) {
         		Logger.log("MAIN SERVER", String.format("Exception raised while attempting to retrieve files from backup server after server failure.%nDetails:%n%s", ex.getMessage()));
-        	} finally {
+        	} catch (InterruptedException e) {
+				e.printStackTrace();
+			} finally {
         		server.unlock();
         	}
         }
@@ -794,9 +798,35 @@ public class UAServer {
 		// ******************************************
 		
 		
-		int[] servers = getServerIndices();
-		var server1 = fileServers.get(servers[0]);
-		var server2 = fileServers.get(servers[1]);
+		ArrayList<String> userFileList = getUserFilenames(user);
+		String metadata = null;
+		
+		for (int i = 0; i < userFileList.size() && metadata == null; i++) {
+			String s = userFileList.get(i);
+			int tick = s.indexOf('`');
+			if (tick != -1 && s.substring(0, tick).equals(filename)) {
+				metadata = s;
+			}
+		}
+		
+		Server server1 = null;
+		Server server2 = null;
+		int[] servers;
+		
+		if(metadata != null) {
+			// if updating a file that has already been uploaded, use the servers it's already on
+			String[] tokens = metadata.split("`");
+			servers = new int[2];
+			servers[0] = Integer.parseInt(tokens[1]);
+			servers[1] = Integer.parseInt(tokens[2]);
+		} else {
+			// new file, so get new servers
+			servers = getServerIndices();
+		}
+		
+		server1 = fileServers.get(servers[0]);
+		server2 = fileServers.get(servers[1]);
+		
 		String fileInfo = String.format("%s`%s`%d`%d", filename, user, server1.id, server2.id);
 
 		transferFile(dataIn, user, filename, fileInfo, fileSize, server1, server2);
@@ -827,6 +857,19 @@ public class UAServer {
 		
 	}
 	
+	/**
+	 * Transfers bytes from an input stream to two file servers.
+	 * 
+	 * @param in	InputStream to read from.
+	 * @param user	Username the file belongs to.
+	 * @param filename	Name of the file.
+	 * @param fileInfo	Metadata string.
+	 * @param fileSize	Size of file.
+	 * @param server1	First destination Server.
+	 * @param server2	Second destination Server.
+	 * 
+	 * @throws IOException
+	 */
 	synchronized private static void transferFile(BufferedInputStream in, String user, String filename,  String fileInfo, int fileSize, Server server1, Server server2) throws IOException {
 		
 //		server1.lock();
@@ -838,14 +881,19 @@ public class UAServer {
 		}
 		server1.sendCommand(String.format("%s %s %s\n", user, filename, fileSize));
 		
-//		server2.lock();
-		server2.sendCommand("add\n");
-		try {
-			Thread.sleep(200);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
+
+		
+		if(server1 != server2) {
+//			server2.lock();
+			server2.sendCommand("add\n");
+			try {
+				Thread.sleep(200);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+			server2.sendCommand(String.format("%s %s %s\n", user, filename, fileSize));
+			
 		}
-		server2.sendCommand(String.format("%s %s %s\n", user, filename, fileSize));
 		
 		int pageSize = 4096;
 		byte[] buffer = new byte[pageSize];
@@ -857,7 +905,9 @@ public class UAServer {
 		
 		while((bytesRead = in.read(buffer, 0, Math.min(pageSize, bytesLeft))) > 0) {
 			server1.sendBytes(buffer, 0, Math.min(pageSize, bytesLeft));
-			server2.sendBytes(buffer, 0, Math.min(pageSize, bytesLeft));
+			if(server1 != server2) {
+				server2.sendBytes(buffer, 0, Math.min(pageSize, bytesLeft));
+			}
 			bytesSent += Math.min(pageSize, bytesLeft);
 			bytesLeft -= bytesRead;
 		}
@@ -867,8 +917,11 @@ public class UAServer {
 		server1.add(fileInfo);
 //		server1.unlock();
 		
-		server2.add(fileInfo);
-//		server2.unlock();
+		if(server1 != server2) {
+			server2.add(fileInfo);
+//			server2.unlock();
+		}
+
 	}
 
 	/**
@@ -906,6 +959,13 @@ public class UAServer {
     	return new int[] {server1, server2};
     }    
 
+    /**
+     * -- DEPRICATED --
+     * <p>
+     * A message dispatcher that can run on a separate thread.
+     * Checks the message queue every half second and dispatches
+     * the messages it contains to clients.
+     */
 	private static class DispatcherService extends Thread {
 
 		@Override
@@ -948,7 +1008,10 @@ public class UAServer {
 		}
 
     }
-
+	
+	/**
+     * A helper class that is used to communicate and interact with a server.
+     */
     private static class Server {
     	
     	int id;
@@ -958,6 +1021,14 @@ public class UAServer {
     	HashMap<String, String> files = new HashMap<>();
     	final ReentrantLock SERVER_LOCK = new ReentrantLock();
     	
+    	/**
+         * Creates a Server object and assigns to it the specified
+         * socket, input stream, and output stream.
+         * 
+         * @param socket The server's socket.
+         * @param in The server's input stream.
+         * @param out The server's output stream.
+         */
     	Server(Socket socket, BufferedInputStream in, DataOutputStream out) {
     		this.socket = socket;
     		this.in = in;
@@ -965,22 +1036,49 @@ public class UAServer {
     		id = socket.getPort();
     	}
     	
+    	/**
+         * Adds a file name to the server's file name map.
+         * 
+         * @param filename The name of a file on the physical server add.
+         */
     	void add(String filename) {
     			files.put(filename, filename);
     	}
     	
+    	/**
+         * Removes a file name from the server's file name map.
+         * 
+         * @param filename The name of a file on the physical server to remove.
+         */
     	void remove(String filename) {
     			files.remove(filename);
     	}
     	
+    	/**
+         * Returns a list containing the names of the files
+         * stored on the physical server this object represents.
+         * 
+         * @return An ArrayList of file names.
+         */
     	ArrayList<String> list() {
     		return new ArrayList<>(files.values());
     	}
     	
+    	/**
+         * Closes the server's socket.
+         * 
+         * @throws IOException
+         */
     	void shutdown() throws IOException {
 			socket.close();
     	}
     	
+    	/**
+         * Sends a command to the server.
+         * 
+         * @param command The command to send.
+         * @throws IOException
+         */
     	void sendCommand(String command) throws IOException {
     		
     		if (command != null && command.length() > 0) {
@@ -992,15 +1090,30 @@ public class UAServer {
     		}
     	}
     	
+    	/**
+         * Writes [len] bytes to the server's output stream,
+         * starting at index [off].
+         * 
+         * @param b The byte array to send.
+         * @param off The offset index at which to start reading the byte array.
+         * @param len The number of bytes to send.
+         * @throws IOException
+         */
     	void sendBytes(byte[] b, int off, int len) throws IOException {
 			out.write(b, off, len);
 			out.flush();
     	}
     	
+    	/**
+         * Locks the server.
+         */
     	void lock() {
     		SERVER_LOCK.lock();
     	}
     	
+    	/**
+         * Unlocks the server.
+         */
     	void unlock() {
     		SERVER_LOCK.unlock();
     	}
