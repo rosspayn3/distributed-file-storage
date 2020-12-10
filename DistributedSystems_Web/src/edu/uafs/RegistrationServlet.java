@@ -40,6 +40,12 @@ public class RegistrationServlet extends HttpServlet {
 
 	/**
 	 * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse response)
+	 * <p>
+	 * Accepts a username and password from {@code register.jsp}. The credentials are then sent to an 
+	 * instance of {@link UAServer} using the browser session's {@link WebClient} socket connection. 
+	 * The credentials are then stored for future use.
+	 * <p>
+	 * This method assigns a success/error message before forwarding the request.
 	 */
 	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 		
