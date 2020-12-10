@@ -834,7 +834,6 @@ public class UAServer {
 		try {
 			Thread.sleep(200);
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		server1.sendCommand(String.format("%s %s %s\n", user, filename, fileSize));
@@ -844,7 +843,6 @@ public class UAServer {
 		try {
 			Thread.sleep(200);
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		server2.sendCommand(String.format("%s %s %s\n", user, filename, fileSize));
@@ -853,12 +851,18 @@ public class UAServer {
 		byte[] buffer = new byte[pageSize];
 		int bytesRead = 0;
 		int bytesLeft = fileSize;
+		int bytesSent = 0;
+		
+		Logger.log("MAIN SERVER", String.format("Bytes to read: [%d]", bytesLeft));
 		
 		while((bytesRead = in.read(buffer, 0, Math.min(pageSize, bytesLeft))) > 0) {
 			server1.sendBytes(buffer, 0, Math.min(pageSize, bytesLeft));
 			server2.sendBytes(buffer, 0, Math.min(pageSize, bytesLeft));
+			bytesSent += Math.min(pageSize, bytesLeft);
 			bytesLeft -= bytesRead;
 		}
+		
+		Logger.log("MAIN SERVER", String.format("Total bytes sent: [%d]", bytesSent));
 		
 		server1.add(fileInfo);
 //		server1.unlock();
@@ -990,6 +994,7 @@ public class UAServer {
     	
     	void sendBytes(byte[] b, int off, int len) throws IOException {
 			out.write(b, off, len);
+			out.flush();
     	}
     	
     	void lock() {
