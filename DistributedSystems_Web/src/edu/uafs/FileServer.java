@@ -9,11 +9,13 @@ package edu.uafs;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
@@ -67,13 +69,16 @@ public class FileServer {
 			switch (line) {
 			case "add":
 				try {
-					addFile(commandIn, fileServerIn, fileServerOut);
+					Logger.log("FILE SERVER", "Received add command.");
+					String meta = commandIn.readLine();
+					addFile(meta, new DataInputStream(socket.getInputStream()), fileServerOut);
 				} catch (IOException ex) {
 					Logger.log("FILE SERVER", String.format("Exception thrown while adding a file.%nDetails:%n%s%n%n", ex.getMessage()));
 				}
 				break;
 			case "backup":
 				try {
+					Logger.log("FILE SERVER", "Received backup command.");
 					download(commandIn, fileServerIn, fileServerOut, true);
 				} catch (IOException ex) {
 					Logger.log("FILE SERVER", String.format("Exception thrown while backing up a file.%nDetails:%n%s%n%n", ex.getMessage()));
@@ -81,12 +86,14 @@ public class FileServer {
 				break;
 			case "download":
 				try {
+					Logger.log("FILE SERVER", "Received download command.");
 					download(commandIn, fileServerIn, fileServerOut, false);
 				} catch (IOException ex) {
 					Logger.log("FILE SERVER", String.format("Exception thrown while downloading a file.%nDetails:%n%s%n%n", ex.getMessage()));
 				}
 			case "remove":
 				try {
+					Logger.log("FILE SERVER", "Received remove command.");
 					removeFile(commandIn);
 				} catch (IOException ex) {
 					Logger.log("FILE SERVER", String.format("Exception thrown while removing a file.%nDetails:%n%s%n%n", ex.getMessage()));
@@ -105,48 +112,46 @@ public class FileServer {
 		return sb.toString();
 	}
 	
-	private static void addFile(BufferedReader r, BufferedInputStream in, DataOutputStream out) throws IOException {
-		int pageSize = 4096;
-		byte[] buffer = new byte[pageSize];
-		int bytesRead = 0;
-		String meta = r.readLine();
+	private static void addFile(String meta, DataInputStream dataIn, DataOutputStream out) throws IOException {
+		
 		String[] tokens = meta.split(" ");
 		String user = tokens[0];
 		String filename = tokens[1];
 		String path = String.format("%s%s%s%s%s",
 				fileDirectory, File.separator, user, File.separator, filename); 
 		int fileSize = Integer.parseInt(tokens[2]);
-		int bytesLeft = fileSize;
 		
 		// create user's directory inside starting directory if it doesn't exist
 		File userdir = new File(fileDirectory + File.separator + user);
-		
 		if(!userdir.exists()) {
+			Logger.log("FILE SERVER", String.format("Creating user directory [%s]...", userdir.getPath()));
 			userdir.mkdirs();
 		}
 		
-		UAFile uaFile = new UAFile(filename, path, user, fileSize);
 		
-		if (files.containsKey(uaFile.getFileID())) {
-			return;
-		}
-		
+		int pageSize = 4096;
+		byte[] buffer = new byte[pageSize];
+		int bytesRead = 0;
+		int bytesLeft = fileSize;
 		File file = new File(userdir + File.separator + filename);
-		
+		UAFile uaFile = new UAFile(filename, path, user, fileSize);
 		var bos = new BufferedOutputStream(new FileOutputStream(file, true));
-		
-		while ((bytesRead = in.read(buffer, 0, Math.min(pageSize, bytesLeft))) > 0) {
+
+		Logger.log("FILE SERVER", String.format("Writing file [%s] to disk. [%d] bytes.", file.getPath(), fileSize));
+
+		while( (bytesRead = dataIn.read(buffer, 0, Math.min(pageSize, bytesLeft))) > 0){
 			bos.write(buffer, 0, Math.min(pageSize, bytesLeft));
 			bytesLeft -= bytesRead;
 		}
-		
-		files.put(uaFile.getFileID(), uaFile);
 		
 		if (bos != null) {
 			bos.close();
 		}
 		
+		files.put(uaFile.getFileID(), uaFile);
+		
 		Logger.log("FILE SERVER", String.format("Successfully wrote file [%s] to disk.", filename));
+
 	}
 	
 	private static void download(BufferedReader r, BufferedInputStream in, DataOutputStream out, boolean backup) throws IOException {

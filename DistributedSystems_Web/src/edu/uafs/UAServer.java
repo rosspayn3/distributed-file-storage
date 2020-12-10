@@ -7,9 +7,11 @@
 package edu.uafs;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
@@ -260,7 +262,6 @@ public class UAServer {
 								serverOut.writeBytes("accepted.\n");
 								serverOut.flush();
 								distributeFile(serverIn, this.currentUser, parameter, cmdArgs[2]);
-								Logger.log("MAIN SERVER", "Add command successfully executed!");
 							}
 						} catch (Exception ex) {
 							Logger.log("MAIN SERVER", "Exception thrown while distributing file.");
@@ -763,50 +764,107 @@ public class UAServer {
 		Logger.log("MAIN SERVER", "============= Distributing file to file servers =============");
 			
 		int fileSize = Integer.parseInt(size);
-		Logger.log("MAIN SERVER", "Size of file about to receive: " + fileSize);
-				
+
+		// ******************************************
+		// WRITE FILE LOCALLY TO DISK FOR EMERGENCY
+		// ******************************************
+		
+//		int pageSize = 4096;
+//		byte[] buffer = new byte[pageSize];
+//		int bytesRead = 0;
+//		int bytesLeft = fileSize;
+//
+//		File userDir = new File("files" + File.separator + user);
+//		
+//		if(!userDir.exists()) {
+//			userDir.mkdirs();
+//		}
+//		
+//		BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(userDir + File.separator +filename));
+//		
+//		while( (bytesRead = dataIn.read(buffer, 0, Math.min(pageSize, bytesLeft))) > 0){
+//			bos.write(buffer, 0, Math.min(pageSize, bytesLeft));
+//			bytesLeft -= bytesRead;
+//		}
+//		
+//		bos.close();
+		
+		// ******************************************
+		// END WRITE FILE LOCALLY TO DISK
+		// ******************************************
+		
+		
 		int[] servers = getServerIndices();
 		var server1 = fileServers.get(servers[0]);
 		var server2 = fileServers.get(servers[1]);
-		
 		String fileInfo = String.format("%s`%s`%d`%d", filename, user, server1.id, server2.id);
+
+		transferFile(dataIn, user, filename, fileInfo, fileSize, server1, server2);
 		
-		ArrayList<Byte> data = readAllBytes(dataIn, fileSize);
+//		ArrayList<Byte> data = readAllBytes(dataIn, fileSize);
 		
-		Logger.log("MAIN SERVER", "Sending bytes...");
+//		Logger.log("MAIN SERVER", "Sending bytes to server 1...");
 		
-		server1.lock();
-		server1.sendCommand("add\n");
-		server1.sendCommand(String.format("%s %s %s\n", user, filename, size));
-		server1.sendBytes(data);
-		server1.add(fileInfo);
-		server1.unlock();
+//		server1.lock();
+//		server1.sendCommand("add\n");
+//		server1.sendCommand(String.format("%s %s %s%n", user, filename, size));
+//		server1.sendBytes(data);
+//		server1.add(fileInfo);
+//		server1.unlock();
 		
-		server2.lock();
-		server2.sendCommand("add\n");
-		server2.sendCommand(String.format("%s %s %s\n", user, filename, size));
-		server2.sendBytes(data);
-		server2.add(fileInfo);
-		server2.unlock();
+//		Logger.log("MAIN SERVER", "Sending bytes to server 2...");
+
+//		server2.lock();
+//		server2.sendCommand("add\n");
+//		server2.sendCommand(String.format("%s %s %s\n", user, filename, size));
+//		server2.sendBytes(data);
+//		server2.add(fileInfo);
+//		server2.unlock();
 		
-		Logger.log("MAIN SERVER", "Successfully sent " + NumberFormat.getNumberInstance(Locale.US).format(fileSize) + " bytes to each file server.");
+		Logger.log("MAIN SERVER", String.format("Distributed file [%s].", filename));
 		fileCount++;
 		userFiles.get(user).add(filename + "`" + servers[0] + "`" + servers[1]);
+		
 	}
 	
-	private static ArrayList<Byte> readAllBytes(BufferedInputStream in, int fileSize) throws IOException {
-		ArrayList<Byte> data = new ArrayList<>();
+	synchronized private static void transferFile(BufferedInputStream in, String user, String filename,  String fileInfo, int fileSize, Server server1, Server server2) throws IOException {
+		
+//		server1.lock();
+		server1.sendCommand("add\n");
+		try {
+			Thread.sleep(200);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		server1.sendCommand(String.format("%s %s %s\n", user, filename, fileSize));
+		
+//		server2.lock();
+		server2.sendCommand("add\n");
+		try {
+			Thread.sleep(200);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		server2.sendCommand(String.format("%s %s %s\n", user, filename, fileSize));
+		
 		int pageSize = 4096;
 		byte[] buffer = new byte[pageSize];
 		int bytesRead = 0;
 		int bytesLeft = fileSize;
+		
 		while((bytesRead = in.read(buffer, 0, Math.min(pageSize, bytesLeft))) > 0) {
-			for (int i = 0; i < bytesRead; i++) {
-				data.add(buffer[i]);
-			}
+			server1.sendBytes(buffer, 0, Math.min(pageSize, bytesLeft));
+			server2.sendBytes(buffer, 0, Math.min(pageSize, bytesLeft));
 			bytesLeft -= bytesRead;
 		}
-		return data;
+		
+		server1.add(fileInfo);
+//		server1.unlock();
+		
+		server2.add(fileInfo);
+//		server2.unlock();
 	}
 
 	/**
@@ -842,7 +900,7 @@ public class UAServer {
     		server2 = rng.nextInt(fileServers.size());
     	} while (server2 == server1);
     	return new int[] {server1, server2};
-    }
+    }    
 
 	private static class DispatcherService extends Thread {
 
@@ -904,15 +962,11 @@ public class UAServer {
     	}
     	
     	void add(String filename) {
-    		synchronized(files) {
     			files.put(filename, filename);
-    		}
     	}
     	
     	void remove(String filename) {
-    		synchronized(files) {
     			files.remove(filename);
-    		}
     	}
     	
     	ArrayList<String> list() {
@@ -929,33 +983,13 @@ public class UAServer {
     			if (command.charAt(command.length() - 1) != '\n') {
     				command += '\n';
     			}
-	    		synchronized(out) {
 	    			out.writeBytes(command);
-	    			out.flush();
-	    		}
+//	    			out.flush();
     		}
     	}
     	
     	void sendBytes(byte[] b, int off, int len) throws IOException {
-    		synchronized(out) {
-    			out.write(b, off, len);
-    			out.flush();
-    		}
-    	}
-    	
-    	void sendBytes(ArrayList<Byte> data) throws IOException {
-    		int pageSize = 4096;
-    		byte[] buffer = new byte[pageSize];
-    		int len = Math.min(pageSize, data.size());
-    		for (int position = 0, index = 0; position < data.size(); position++) {
-    			buffer[index] = data.get(position);
-    			index++;
-    			if (index >= len) {
-    				index = 0;
-    				sendBytes(buffer, 0, len);
-    				len = Math.min(pageSize, data.size() - position - 1);
-    			}
-    		}
+			out.write(b, off, len);
     	}
     	
     	void lock() {
@@ -965,5 +999,6 @@ public class UAServer {
     	void unlock() {
     		SERVER_LOCK.unlock();
     	}
+    	
     }
 }

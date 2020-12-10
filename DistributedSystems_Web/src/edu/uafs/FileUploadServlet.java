@@ -128,7 +128,7 @@ public class FileUploadServlet extends HttpServlet {
 					Duration timeBetween = Duration.between(start, end);
 					
 					
-					Logger.log("FILEUPLOADSERVLET", String.format("File '%s' of size %d KB sent to UAServer after %sm %ss %sms.",
+					Logger.log("FILEUPLOADSERVLET", String.format("File '%s' of size %s KB sent to UAServer after %sm %ss %sms.",
 														filename, NumberFormat.getNumberInstance(Locale.US).format( ((double) fileSize / 1000.0) ),
 														timeBetween.toMinutesPart(), timeBetween.toSecondsPart(),
 														timeBetween.toMillisPart()

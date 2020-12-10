@@ -167,7 +167,7 @@ public class WebClient {
 		
 		try {
 			clientOut.println(msg);
-			System.out.println("WEBCLIENT: Sent '" + msg + "' to server.");
+//			System.out.println("WEBCLIENT: Sent '" + msg + "' to server.");
 			return true;
 		} catch (Exception e) {
 			System.out.println("!! WEBCLIENT: Exception in WebClient sendMessage method.\n");
