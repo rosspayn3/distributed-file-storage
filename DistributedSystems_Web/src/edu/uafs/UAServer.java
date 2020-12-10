@@ -798,9 +798,35 @@ public class UAServer {
 		// ******************************************
 		
 		
-		int[] servers = getServerIndices();
-		var server1 = fileServers.get(servers[0]);
-		var server2 = fileServers.get(servers[1]);
+		ArrayList<String> userFileList = getUserFilenames(user);
+		String metadata = null;
+		
+		for (int i = 0; i < userFileList.size() && metadata == null; i++) {
+			String s = userFileList.get(i);
+			int tick = s.indexOf('`');
+			if (tick != -1 && s.substring(0, tick).equals(filename)) {
+				metadata = s;
+			}
+		}
+		
+		Server server1 = null;
+		Server server2 = null;
+		int[] servers;
+		
+		if(metadata != null) {
+			// if updating a file that has already been uploaded, use the servers it's already on
+			String[] tokens = metadata.split("`");
+			servers = new int[2];
+			servers[0] = Integer.parseInt(tokens[1]);
+			servers[1] = Integer.parseInt(tokens[2]);
+		} else {
+			// new file, so get new servers
+			servers = getServerIndices();
+		}
+		
+		server1 = fileServers.get(servers[0]);
+		server2 = fileServers.get(servers[1]);
+		
 		String fileInfo = String.format("%s`%s`%d`%d", filename, user, server1.id, server2.id);
 
 		transferFile(dataIn, user, filename, fileInfo, fileSize, server1, server2);
