@@ -199,8 +199,8 @@ public class FileServer {
 	}
 	
 	private static void removeFile(BufferedReader r) throws IOException {
-		String fileId = r.readLine();
-		UAFile uaFile = files.get(fileId);
+		String info = r.readLine();
+		UAFile uaFile = files.get(info);
 		
 		if (uaFile == null) {
 			return;
@@ -208,7 +208,7 @@ public class FileServer {
 		
 		File file = new File(uaFile.getPath());
 		if (!file.isDirectory() && file.delete()) {
-			files.remove(fileId);
+			files.remove(info);
 		}
 	}
 }

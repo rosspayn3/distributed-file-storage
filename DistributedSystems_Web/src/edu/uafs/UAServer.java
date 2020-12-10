@@ -377,7 +377,9 @@ public class UAServer {
 			if (server1 != null) {
 				try {
 					server1.lock();
-					server1.sendCommand(String.format("remove~%s~%s%n", username, filename));
+					server1.sendCommand("remove");
+					Thread.sleep(200);
+					server1.sendCommand(String.format("%s:%s\n", username, filename));
 				} catch (Exception ex) {
 					ex.printStackTrace();
 				} finally {
@@ -391,7 +393,9 @@ public class UAServer {
 			if (server2 != null) {
 				try {
 					server2.lock();
-					server2.sendCommand(String.format("remove~%s~%s%n", username, filename));
+					server2.sendCommand("remove");
+					Thread.sleep(200);
+					server2.sendCommand(String.format("%s:%s\n", username, filename));
 				} catch (Exception ex) {
 					ex.printStackTrace();
 				} finally {
