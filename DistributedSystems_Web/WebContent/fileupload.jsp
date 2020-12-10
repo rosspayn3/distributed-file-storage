@@ -85,9 +85,8 @@
 					<p>Choose a file:</p>
 					<div class="custom-file">
 
-						<input class="custom-file-input" type="file" id="fileupload"
-							name="file"> <label class="custom-file-label"
-							for="fileupload"></label>
+						<input class="custom-file-input" type="file" id="fileupload" name="file" required>
+						<label class="custom-file-label" for="fileupload"></label>
 					</div>
 					<p>
 						<small class="text-warning">*Max file size is 200MB</small>
