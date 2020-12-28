@@ -5,7 +5,7 @@
 Our team developed a distributed database system based on the requirements given in the final project document. The system allows users to register and sign in with a username and
 password via a web application hosted at http://dist.cs.uafs.edu:32121/dist10. The Apache Tomcat web application and main database server run on the public-facing server. File server nodes run on one or more of the internal servers. Files uploaded from the browser are forwarded from the main server to one or more of the available file servers, then written to disk in the user’s directory.
 
-# Features
+## Features
 
 - Web application is functional for desktop and mobile devices
 - Simple register/login page
@@ -21,7 +21,8 @@ password via a web application hosted at http://dist.cs.uafs.edu:32121/dist10. T
 - Automatic load balancing when adding new files to data nodes
 - Redistribution of files if a data node explodes
 
-Technical Specifications
+## Technical Specifications
+
 - When a client connects, a new thread is started that handles input and responses to that client
 - Extensive use of hash maps to improve data access speed
 - Implemented reentrant locks to control concurrent access to servers during file operations
