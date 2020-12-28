@@ -1,5 +1,4 @@
-# distributed-file-storage
-Distributed Systems Final Project Fall '20
+# Distributed Systems Final Project Fall '20
 
 ## Introduction
 
