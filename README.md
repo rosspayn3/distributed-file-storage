@@ -3,7 +3,7 @@
 ## Introduction
 
 Our team developed a distributed database system based on the requirements given in the final project document. The system allows users to register and sign in with a username and
-password via a web application hosted at http://dist.cs.uafs.edu:32121/dist10. The Apache Tomcat web application and main database server run on the public-facing server. File server nodes run on one or more of the internal servers. Files uploaded from the browser are forwarded from the main server to one or more of the available file servers, then written to disk in the user’s directory.
+password via a web application hosted at ~~http://dist.cs.uafs.edu:32121/dist10~~ nowhere. The Apache Tomcat web application and main database server run on the public-facing server. File server nodes run on one or more of the internal servers. Files uploaded from the browser are forwarded from the main server to one or more of the available file servers, then written to disk in the user’s directory.
 
 ## Features
 
